@@ -1,5 +1,6 @@
 import type { Metadata } from 'next'
 import './globals.css'
+import Footer from './components/Footer'
 
 export const metadata: Metadata = {
   title: 'FST Frisbee Statistics Tracker',
@@ -13,7 +14,12 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en">
-      <body>{children}</body>
+      <body>
+        <div className="layout-wrapper">
+          <main>{children}</main>
+          <Footer />
+        </div>
+      </body>
     </html>
   )
 }

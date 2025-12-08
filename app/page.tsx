@@ -5,13 +5,12 @@ export default function HomePage() {
     <div className="container">
       <div className="header">
         <h1>FST</h1>
-        <p className="subtitle">Frisbee Stats Tracker</p>
-        <p className="description">Real-time ultimate stats</p>
+        <p className="subtitle">Frisbee Statistics Tracker</p>
       </div>
       
       <div className="nav-cards">
         <Link href="/games/setup" className="nav-card">
-          <div className="nav-card-icon">🎮</div>
+          <div className="nav-card-icon">🥏</div>
           <span className="nav-card-text">Start New Game</span>
         </Link>
         

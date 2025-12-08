@@ -7,14 +7,15 @@ import { supabase } from '@/lib/supabase'
 interface Player {
   id: string
   name: string
-  jersey_number: number
+  number: number
   team_id: string
 }
 
 interface Team {
   id: string
   name: string
-  color: string
+  color_primary: string
+  color_secondary?: string
   created_at: string
 }
 
@@ -53,7 +54,7 @@ export default function TeamsPage() {
       const { data, error } = await supabase
         .from('players')
         .select('*')
-        .order('jersey_number', { ascending: true })
+        .order('number', { ascending: true })
       
       if (error) throw error
       setPlayers(data || [])
@@ -68,7 +69,7 @@ export default function TeamsPage() {
     try {
       const { data, error } = await supabase
         .from('teams')
-        .insert([{ name: newTeamName, color: newTeamColor }])
+        .insert([{ name: newTeamName, color_primary: newTeamColor }])
         .select()
         .single()
 
@@ -92,7 +93,7 @@ export default function TeamsPage() {
         .from('players')
         .insert([{
           name: newPlayerName,
-          jersey_number: parseInt(newPlayerJersey),
+          number: parseInt(newPlayerJersey),
           team_id: teamId
         }])
         .select()
@@ -190,7 +191,7 @@ export default function TeamsPage() {
                 <div className="team-info">
                   <div 
                     className="team-color-indicator"
-                    style={{ backgroundColor: team.color }}
+                    style={{ backgroundColor: team.color_primary }}
                   />
                   <div>
                     <h3>{team.name}</h3>
@@ -252,7 +253,7 @@ export default function TeamsPage() {
                     ) : (
                       teamPlayers.map(player => (
                         <div key={player.id} className="player-item">
-                          <span className="jersey-number">#{player.jersey_number}</span>
+                          <span className="jersey-number">#{player.number}</span>
                           <span className="player-name">{player.name}</span>
                           <button
                             onClick={() => deletePlayer(player.id)}

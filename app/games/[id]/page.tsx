@@ -6,16 +6,24 @@ import { supabase } from '@/lib/supabase'
 
 interface Game {
   id: string
+  team_home_id: string
+  team_away_id: string
+  home_score: number
+  away_score: number
+  location?: string
+  date: string
+}
+
+interface Team {
+  id: string
   name: string
-  light_team_id: string
-  dark_team_id: string
-  light_score: number
-  dark_score: number
-  status: string
+  color_primary: string
 }
 
 export default function GamePage({ params }: { params: { id: string } }) {
   const [game, setGame] = useState<Game | null>(null)
+  const [homeTeam, setHomeTeam] = useState<Team | null>(null)
+  const [awayTeam, setAwayTeam] = useState<Team | null>(null)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -24,14 +32,40 @@ export default function GamePage({ params }: { params: { id: string } }) {
 
   const loadGame = async () => {
     try {
-      const { data, error } = await supabase
+      const { data: gameData, error: gameError } = await supabase
         .from('games')
         .select('*')
         .eq('id', params.id)
         .single()
 
-      if (error) throw error
-      setGame(data)
+      if (gameError) throw gameError
+      setGame(gameData)
+
+      // Fetch home team
+      if (gameData.team_home_id) {
+        const { data: homeTeamData, error: homeError } = await supabase
+          .from('teams')
+          .select('*')
+          .eq('id', gameData.team_home_id)
+          .single()
+
+        if (!homeError && homeTeamData) {
+          setHomeTeam(homeTeamData)
+        }
+      }
+
+      // Fetch away team
+      if (gameData.team_away_id) {
+        const { data: awayTeamData, error: awayError } = await supabase
+          .from('teams')
+          .select('*')
+          .eq('id', gameData.team_away_id)
+          .single()
+
+        if (!awayError && awayTeamData) {
+          setAwayTeam(awayTeamData)
+        }
+      }
     } catch (error) {
       console.error('Error loading game:', error)
     } finally {
@@ -62,25 +96,25 @@ export default function GamePage({ params }: { params: { id: string } }) {
     <div className="container">
       <div className="header">
         <Link href="/" className="back-button">← Back</Link>
-        <h1>{game.name || 'Game'}</h1>
+        <h1>{game.location || 'Game'}</h1>
       </div>
 
       <div className="game-score">
         <div className="score-display">
           <div className="score-team">
-            <h2>Light</h2>
-            <div className="score-value">{game.light_score}</div>
+            <h2>{homeTeam?.name || 'Home Team'}</h2>
+            <div className="score-value">{game.home_score}</div>
           </div>
           <div className="score-separator">-</div>
           <div className="score-team">
-            <h2>Dark</h2>
-            <div className="score-value">{game.dark_score}</div>
+            <h2>{awayTeam?.name || 'Away Team'}</h2>
+            <div className="score-value">{game.away_score}</div>
           </div>
         </div>
       </div>
 
       <div className="game-info">
-        <p className="game-status">Status: {game.status}</p>
+        <p className="game-status">Date: {new Date(game.date).toLocaleDateString()}</p>
         <p className="info-text">Point tracking and stat entry will be available in Phase 2.</p>
       </div>
     </div>

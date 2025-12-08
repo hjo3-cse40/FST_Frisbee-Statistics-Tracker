@@ -7,14 +7,15 @@ import { supabase } from '@/lib/supabase'
 interface Team {
   id: string
   name: string
-  color: string
+  color_primary: string
+  color_secondary?: string
 }
 
 export default function GameSetupPage() {
   const [teams, setTeams] = useState<Team[]>([])
-  const [lightTeamId, setLightTeamId] = useState<string>('')
-  const [darkTeamId, setDarkTeamId] = useState<string>('')
-  const [gameName, setGameName] = useState('')
+  const [homeTeamId, setHomeTeamId] = useState<string>('')
+  const [awayTeamId, setAwayTeamId] = useState<string>('')
+  const [gameLocation, setGameLocation] = useState('')
 
   useEffect(() => {
     loadTeams()
@@ -35,24 +36,23 @@ export default function GameSetupPage() {
   }
 
   const createGame = async () => {
-    if (!lightTeamId || !darkTeamId) {
-      alert('Please select both light and dark teams')
+    if (!homeTeamId || !awayTeamId) {
+      alert('Please select both home and away teams')
       return
     }
 
-    if (lightTeamId === darkTeamId) {
-      alert('Light and dark teams must be different')
+    if (homeTeamId === awayTeamId) {
+      alert('Home and away teams must be different')
       return
     }
 
     try {
       const gameData = {
-        name: gameName || `Game ${new Date().toLocaleDateString()}`,
-        light_team_id: lightTeamId,
-        dark_team_id: darkTeamId,
-        light_score: 0,
-        dark_score: 0,
-        status: 'active'
+        team_home_id: homeTeamId,
+        team_away_id: awayTeamId,
+        home_score: 0,
+        away_score: 0,
+        location: gameLocation || null
       }
 
       const { data, error } = await supabase
@@ -80,33 +80,33 @@ export default function GameSetupPage() {
 
       <div className="game-setup-form">
         <div className="form-group">
-          <label>Game Name (optional)</label>
+          <label>Location (optional)</label>
           <input
             type="text"
-            placeholder="e.g., Practice Scrimmage"
-            value={gameName}
-            onChange={(e) => setGameName(e.target.value)}
+            placeholder="e.g., Practice Field"
+            value={gameLocation}
+            onChange={(e) => setGameLocation(e.target.value)}
             className="input"
           />
         </div>
 
         <div className="team-selection">
           <div className="team-selection-group">
-            <h2>Light Team</h2>
+            <h2>Home Team</h2>
             <div className="team-options">
               {teams.map(team => (
                 <button
                   key={team.id}
-                  className={`team-option ${lightTeamId === team.id ? 'selected' : ''}`}
-                  onClick={() => setLightTeamId(team.id)}
+                  className={`team-option ${homeTeamId === team.id ? 'selected' : ''}`}
+                  onClick={() => setHomeTeamId(team.id)}
                   style={{
-                    borderColor: lightTeamId === team.id ? team.color : '#e5e7eb',
-                    backgroundColor: lightTeamId === team.id ? `${team.color}20` : 'transparent'
+                    borderColor: homeTeamId === team.id ? team.color_primary : '#e5e7eb',
+                    backgroundColor: homeTeamId === team.id ? `${team.color_primary}20` : 'transparent'
                   }}
                 >
                   <div
                     className="team-option-color"
-                    style={{ backgroundColor: team.color }}
+                    style={{ backgroundColor: team.color_primary }}
                   />
                   <span>{team.name}</span>
                 </button>
@@ -115,21 +115,21 @@ export default function GameSetupPage() {
           </div>
 
           <div className="team-selection-group">
-            <h2>Dark Team</h2>
+            <h2>Away Team</h2>
             <div className="team-options">
               {teams.map(team => (
                 <button
                   key={team.id}
-                  className={`team-option ${darkTeamId === team.id ? 'selected' : ''}`}
-                  onClick={() => setDarkTeamId(team.id)}
+                  className={`team-option ${awayTeamId === team.id ? 'selected' : ''}`}
+                  onClick={() => setAwayTeamId(team.id)}
                   style={{
-                    borderColor: darkTeamId === team.id ? team.color : '#e5e7eb',
-                    backgroundColor: darkTeamId === team.id ? `${team.color}20` : 'transparent'
+                    borderColor: awayTeamId === team.id ? team.color_primary : '#e5e7eb',
+                    backgroundColor: awayTeamId === team.id ? `${team.color_primary}20` : 'transparent'
                   }}
                 >
                   <div
                     className="team-option-color"
-                    style={{ backgroundColor: team.color }}
+                    style={{ backgroundColor: team.color_primary }}
                   />
                   <span>{team.name}</span>
                 </button>
@@ -150,7 +150,7 @@ export default function GameSetupPage() {
         {teams.length > 0 && (
           <button
             onClick={createGame}
-            disabled={!lightTeamId || !darkTeamId}
+            disabled={!homeTeamId || !awayTeamId}
             className="primary-button large"
           >
             Start Game
