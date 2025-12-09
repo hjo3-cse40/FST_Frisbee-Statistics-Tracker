@@ -11,6 +11,7 @@ interface Game {
   home_score: number
   away_score: number
   location?: string
+  name?: string
   date: string
 }
 
@@ -96,7 +97,10 @@ export default function GamePage({ params }: { params: { id: string } }) {
     <div className="container">
       <div className="header">
         <Link href="/" className="back-button">← Back</Link>
-        <h1>{game.location || 'Game'}</h1>
+        <h1>{game.name || game.location || 'Game'}</h1>
+        {game.name && game.location && (
+          <p className="subtitle">{game.location}</p>
+        )}
       </div>
 
       <div className="game-score">

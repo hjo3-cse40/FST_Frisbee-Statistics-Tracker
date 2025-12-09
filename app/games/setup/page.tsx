@@ -16,6 +16,7 @@ export default function GameSetupPage() {
   const [homeTeamId, setHomeTeamId] = useState<string>('')
   const [awayTeamId, setAwayTeamId] = useState<string>('')
   const [gameLocation, setGameLocation] = useState('')
+  const [gameName, setGameName] = useState('')
 
   useEffect(() => {
     loadTeams()
@@ -47,12 +48,17 @@ export default function GameSetupPage() {
     }
 
     try {
-      const gameData = {
+      const gameData: any = {
         team_home_id: homeTeamId,
         team_away_id: awayTeamId,
         home_score: 0,
         away_score: 0,
-        location: gameLocation || null
+        location: gameLocation.trim() || null
+      }
+
+      // Only include name if it's provided (in case the column doesn't exist yet)
+      if (gameName.trim()) {
+        gameData.name = gameName.trim()
       }
 
       const { data, error } = await supabase
@@ -61,13 +67,17 @@ export default function GameSetupPage() {
         .select()
         .single()
 
-      if (error) throw error
+      if (error) {
+        console.error('Supabase error:', error)
+        throw error
+      }
 
       // Redirect to game page (to be created in Phase 2)
       window.location.href = `/games/${data.id}`
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error creating game:', error)
-      alert('Failed to create game')
+      const errorMessage = error?.message || 'Unknown error occurred'
+      alert(`Failed to create game: ${errorMessage}\n\nIf you see a column error, you may need to add a "name" column to the games table.`)
     }
   }
 
@@ -79,6 +89,17 @@ export default function GameSetupPage() {
       </div>
 
       <div className="game-setup-form">
+        <div className="form-group">
+          <label>Game Name (optional)</label>
+          <input
+            type="text"
+            placeholder="e.g., President's Day Invite Pool Play: Cal vs Santa Cruz"
+            value={gameName}
+            onChange={(e) => setGameName(e.target.value)}
+            className="input"
+          />
+        </div>
+
         <div className="form-group">
           <label>Location (optional)</label>
           <input
