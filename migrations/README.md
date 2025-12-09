@@ -55,6 +55,17 @@ Adds support for tracking turnovers vs blocks/defensive plays with proper separa
 - Block/D is an **action** (defensive play) tracked via `event_type`
 - A block can cause a turnover (is_turnover = true) or not (is_turnover = false)
 
+### `add_points_to_win.sql` (Points to Win)
+
+Adds support for tracking the winning score for games.
+
+**What it adds:**
+- `points_to_win` integer column - number of points required to win (e.g., 15, 21)
+- Default value of 15 for existing games
+- Required field for new games
+
+**Important:** Run this migration to enable win detection. When a team reaches `points_to_win`, the game is considered over and a win message is displayed.
+
 ## Verification
 
 After running the migration, you can verify it worked by:

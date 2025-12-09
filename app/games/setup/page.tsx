@@ -18,6 +18,7 @@ export default function GameSetupPage() {
   const [pullingTeamId, setPullingTeamId] = useState<string>('')
   const [gameLocation, setGameLocation] = useState('')
   const [gameName, setGameName] = useState('')
+  const [pointsToWin, setPointsToWin] = useState<number>(15)
 
   // Set default pulling team when both teams are selected
   useEffect(() => {
@@ -60,6 +61,11 @@ export default function GameSetupPage() {
       return
     }
 
+    if (!pointsToWin || pointsToWin < 1) {
+      alert('Please enter a valid number of points to win (must be at least 1)')
+      return
+    }
+
     try {
       const gameData: any = {
         team_home_id: homeTeamId,
@@ -67,6 +73,7 @@ export default function GameSetupPage() {
         pulling_team_id: pullingTeamId,
         home_score: 0,
         away_score: 0,
+        points_to_win: pointsToWin,
         location: gameLocation.trim() || null
       }
 
@@ -123,6 +130,23 @@ export default function GameSetupPage() {
             onChange={(e) => setGameLocation(e.target.value)}
             className="input"
           />
+        </div>
+
+        <div className="form-group">
+          <label>Points to Win *</label>
+          <input
+            type="number"
+            min="1"
+            max="50"
+            placeholder="e.g., 15"
+            value={pointsToWin}
+            onChange={(e) => setPointsToWin(parseInt(e.target.value) || 15)}
+            className="input"
+            required
+          />
+          <p style={{ fontSize: '0.875rem', color: '#6b7280', marginTop: '0.5rem' }}>
+            First team to reach this score wins the game (common: 15 or 21)
+          </p>
         </div>
 
         <div className="team-selection">
@@ -217,7 +241,7 @@ export default function GameSetupPage() {
         {teams.length > 0 && (
           <button
             onClick={createGame}
-            disabled={!homeTeamId || !awayTeamId || !pullingTeamId}
+            disabled={!homeTeamId || !awayTeamId || !pullingTeamId || !pointsToWin || pointsToWin < 1}
             className="primary-button large"
           >
             Start Game

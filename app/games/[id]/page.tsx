@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
 import { supabase } from '@/lib/supabase'
@@ -13,6 +13,7 @@ interface Game {
   pulling_team_id?: string | null
   home_score: number
   away_score: number
+  points_to_win: number
   location?: string
   name?: string
   date: string
@@ -80,6 +81,7 @@ export default function GamePage({ params }: { params: { id: string } }) {
   const [pendingDefensiveEventType, setPendingDefensiveEventType] = useState<'block' | 'interception' | 'callahan' | null>(null)
   const [showOffensiveCauseSelection, setShowOffensiveCauseSelection] = useState(false)
   const [pendingDefensiveEventConfirmed, setPendingDefensiveEventConfirmed] = useState<{ playerId: string, eventType: 'block' | 'interception' | 'callahan', isTurnover: boolean } | null>(null)
+  const activePointRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     loadGame()
@@ -144,7 +146,12 @@ export default function GamePage({ params }: { params: { id: string } }) {
       const incompletePoint = data?.find(p => !p.scoring_team_id)
       if (incompletePoint) {
         setActivePoint(incompletePoint)
-        loadActivePointData(incompletePoint.id)
+        loadActivePointData(incompletePoint.id).then(() => {
+          // Scroll to the active point after loading
+          setTimeout(() => {
+            activePointRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+          }, 100)
+        })
       }
     } catch (error) {
       console.error('Error loading points:', error)
@@ -260,9 +267,18 @@ export default function GamePage({ params }: { params: { id: string } }) {
     }
 
     try {
-      // Get next sequence number
-      const nextSequence = events.length > 0 
-        ? Math.max(...events.map(e => e.sequence_number)) + 1 
+      // Fetch fresh events from database to ensure we have the latest sequence numbers
+      const { data: currentEvents, error: eventsError } = await supabase
+        .from('events')
+        .select('*')
+        .eq('point_id', activePoint.id)
+        .order('sequence_number', { ascending: true })
+
+      if (eventsError) throw eventsError
+
+      // Get next sequence number from fresh data
+      const nextSequence = currentEvents && currentEvents.length > 0 
+        ? Math.max(...currentEvents.map((e: Event) => e.sequence_number)) + 1 
         : 1
 
       // Map old event types to new ones for backward compatibility
@@ -653,9 +669,33 @@ export default function GamePage({ params }: { params: { id: string } }) {
 
       if (gameError) throw gameError
 
+      // Check if a team has won
+      const winningTeam = newHomeScore >= game.points_to_win 
+        ? homeTeam 
+        : newAwayScore >= game.points_to_win 
+        ? awayTeam 
+        : null
+
       // Reload game and points
       await loadGame()
       await loadPoints()
+
+      // Clear active point
+      setActivePoint(null)
+      setActivePointPlayers([])
+      setEvents([])
+
+      // Scroll to top to show the score and "Start New Point" button
+      setTimeout(() => {
+        window.scrollTo({ top: 0, behavior: 'smooth' })
+      }, 100)
+
+      // Show win message if game is over
+      if (winningTeam) {
+        setTimeout(() => {
+          alert(`🎉 ${winningTeam.name} wins! Final score: ${newHomeScore}-${newAwayScore}`)
+        }, 500)
+      }
       
       // Clear active point
       setActivePoint(null)
@@ -787,6 +827,13 @@ export default function GamePage({ params }: { params: { id: string } }) {
   const savePointAndLineups = async () => {
     if (!game) return
 
+    // Check if game is over
+    if (game.home_score >= game.points_to_win || game.away_score >= game.points_to_win) {
+      const winningTeam = game.home_score >= game.points_to_win ? homeTeam : awayTeam
+      alert(`Game is over! ${winningTeam?.name || 'A team'} has already won.`)
+      return
+    }
+
     // Validate that we have 7 players for each team
     if (selectedHomePlayers.length !== 7) {
       alert(`Please select exactly 7 players for ${homeTeam?.name || 'home team'}`)
@@ -851,6 +898,11 @@ export default function GamePage({ params }: { params: { id: string } }) {
       setShowLineupSelection(false)
       setSelectedHomePlayers([])
       setSelectedAwayPlayers([])
+
+      // Scroll to the new point after a short delay to ensure it's rendered
+      setTimeout(() => {
+        activePointRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+      }, 100)
     } catch (error: any) {
       console.error('Error saving point:', error)
       alert(`Failed to save point: ${error?.message || 'Unknown error'}`)
@@ -901,14 +953,100 @@ export default function GamePage({ params }: { params: { id: string } }) {
       <div className="game-score">
         <div className="score-display">
           <div className="score-team">
-            <h2>{homeTeam?.name || 'Home Team'}</h2>
-            <div className="score-value">{game.home_score}</div>
+            {(() => {
+              const homeIsGamePoint = game.home_score === game.points_to_win - 1 && game.away_score < game.points_to_win - 1
+              const isUniverse = game.home_score === game.points_to_win - 1 && game.away_score === game.points_to_win - 1
+              
+              return (
+                <>
+                  {homeIsGamePoint && !isUniverse && (
+                    <div style={{ 
+                      fontSize: '0.75rem', 
+                      fontWeight: 700, 
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.1em',
+                      color: '#dc2626',
+                      marginBottom: '0.25rem'
+                    }}>
+                      GAMEPOINT
+                    </div>
+                  )}
+                  <h2>{homeTeam?.name || 'Home Team'}</h2>
+                </>
+              )
+            })()}
+            <div className="score-value" style={{ 
+              color: game.home_score >= game.points_to_win ? '#059669' : 'var(--text-primary)',
+              fontWeight: game.home_score >= game.points_to_win ? 800 : 700
+            }}>
+              {game.home_score}
+            </div>
+            {game.home_score >= game.points_to_win && (
+              <div style={{ fontSize: '0.875rem', color: '#059669', fontWeight: 600, marginTop: '0.25rem' }}>
+                🏆 Winner!
+              </div>
+            )}
           </div>
-          <div className="score-separator">-</div>
+          <div className="score-separator" style={{ position: 'relative' }}>
+            {(() => {
+              const isUniverse = game.home_score === game.points_to_win - 1 && game.away_score === game.points_to_win - 1
+              return isUniverse ? (
+                <div style={{
+                  position: 'absolute',
+                  top: '-1.5rem',
+                  left: '50%',
+                  transform: 'translateX(-50%)',
+                  fontSize: '0.75rem',
+                  fontWeight: 700,
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.1em',
+                  color: '#dc2626',
+                  whiteSpace: 'nowrap'
+                }}>
+                  UNIVERSE
+                </div>
+              ) : null
+            })()}
+            -
+          </div>
           <div className="score-team">
-            <h2>{awayTeam?.name || 'Away Team'}</h2>
-            <div className="score-value">{game.away_score}</div>
+            {(() => {
+              const awayIsGamePoint = game.away_score === game.points_to_win - 1 && game.home_score < game.points_to_win - 1
+              const isUniverse = game.home_score === game.points_to_win - 1 && game.away_score === game.points_to_win - 1
+              
+              return (
+                <>
+                  {awayIsGamePoint && !isUniverse && (
+                    <div style={{ 
+                      fontSize: '0.75rem', 
+                      fontWeight: 700, 
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.1em',
+                      color: '#dc2626',
+                      marginBottom: '0.25rem'
+                    }}>
+                      GAMEPOINT
+                    </div>
+                  )}
+                  <h2>{awayTeam?.name || 'Away Team'}</h2>
+                </>
+              )
+            })()}
+            <div className="score-value" style={{ 
+              color: game.away_score >= game.points_to_win ? '#059669' : 'var(--text-primary)',
+              fontWeight: game.away_score >= game.points_to_win ? 800 : 700
+            }}>
+              {game.away_score}
+            </div>
+            {game.away_score >= game.points_to_win && (
+              <div style={{ fontSize: '0.875rem', color: '#059669', fontWeight: 600, marginTop: '0.25rem' }}>
+                🏆 Winner!
+              </div>
+            )}
           </div>
+        </div>
+        <div style={{ textAlign: 'center', marginTop: '0.5rem', fontSize: '0.875rem', color: 'var(--text-tertiary)' }}>
+          Playing to {game.points_to_win}
         </div>
       </div>
 
@@ -917,13 +1055,24 @@ export default function GamePage({ params }: { params: { id: string } }) {
       </div>
 
       <div style={{ marginTop: '2rem' }}>
-        <button
-          onClick={startNewPoint}
-          className="primary-button large"
-          style={{ width: '100%', marginBottom: '1rem' }}
-        >
-          Start New Point
-        </button>
+        {(() => {
+          const gameIsOver = game.home_score >= game.points_to_win || game.away_score >= game.points_to_win
+          return (
+            <button
+              onClick={startNewPoint}
+              disabled={gameIsOver}
+              className="primary-button large"
+              style={{ 
+                width: '100%', 
+                marginBottom: '1rem',
+                opacity: gameIsOver ? 0.5 : 1,
+                cursor: gameIsOver ? 'not-allowed' : 'pointer'
+              }}
+            >
+              {gameIsOver ? 'Game Over' : 'Start New Point'}
+            </button>
+          )
+        })()}
 
         {points.length > 0 && (
           <div style={{ marginTop: '2rem' }}>
@@ -956,10 +1105,14 @@ export default function GamePage({ params }: { params: { id: string } }) {
                 return (
                   <div
                     key={point.id}
-                    onClick={() => {
+                    onClick={async () => {
                       if (!point.scoring_team_id) {
                         setActivePoint(point)
-                        loadActivePointData(point.id)
+                        await loadActivePointData(point.id)
+                        // Scroll to the active point after loading
+                        setTimeout(() => {
+                          activePointRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+                        }, 100)
                       }
                     }}
                     style={{
@@ -993,7 +1146,7 @@ export default function GamePage({ params }: { params: { id: string } }) {
 
       {/* Live Point Tracker */}
       {activePoint && (
-        <div style={{ 
+        <div ref={activePointRef} style={{ 
           marginTop: '2rem', 
           padding: '1.5rem',
           border: '2px solid #3B82F6',
@@ -1611,14 +1764,33 @@ export default function GamePage({ params }: { params: { id: string } }) {
                                 // For callahans, use the special handler
                                 await handleCallahanClick(pendingDefensiveEventConfirmed.playerId, player.id)
                               } else {
-                                // Record throwaway on the offensive player
-                                await recordEvent('throwaway', player.id, undefined, true)
-                                // Record the defensive play (block/interception)
-                                await recordEvent(pendingDefensiveEventConfirmed.eventType, pendingDefensiveEventConfirmed.playerId, undefined, true)
-                                setShowOffensiveCauseSelection(false)
-                                setPendingDefensiveEventConfirmed(null)
-                                setPendingBlockPlayer(null)
-                                setPendingDefensiveEventType(null)
+                                try {
+                                  // Record throwaway on the offensive player first
+                                  await recordEvent('throwaway', player.id, undefined, true)
+                                  
+                                  // Fetch fresh events to get the updated sequence number
+                                  const { data: updatedEvents, error: eventsError } = await supabase
+                                    .from('events')
+                                    .select('*')
+                                    .eq('point_id', activePoint.id)
+                                    .order('sequence_number', { ascending: true })
+
+                                  if (eventsError) throw eventsError
+                                  
+                                  // Reload events state
+                                  await loadActivePointData(activePoint.id)
+                                  
+                                  // Now record the defensive play (block/interception) with correct sequence
+                                  await recordEvent(pendingDefensiveEventConfirmed.eventType, pendingDefensiveEventConfirmed.playerId, undefined, true)
+                                  
+                                  setShowOffensiveCauseSelection(false)
+                                  setPendingDefensiveEventConfirmed(null)
+                                  setPendingBlockPlayer(null)
+                                  setPendingDefensiveEventType(null)
+                                } catch (error: any) {
+                                  console.error('Error recording events:', error)
+                                  alert(`Failed to record events: ${error?.message || 'Unknown error'}`)
+                                }
                               }
                             }}
                             className="secondary-button"
@@ -1633,12 +1805,17 @@ export default function GamePage({ params }: { params: { id: string } }) {
                               // For callahans, use the special handler
                               await handleCallahanClick(pendingDefensiveEventConfirmed.playerId)
                             } else {
-                              // No specific offensive player - just record the defensive play
-                              await recordEvent(pendingDefensiveEventConfirmed.eventType, pendingDefensiveEventConfirmed.playerId, undefined, true)
-                              setShowOffensiveCauseSelection(false)
-                              setPendingDefensiveEventConfirmed(null)
-                              setPendingBlockPlayer(null)
-                              setPendingDefensiveEventType(null)
+                              try {
+                                // No specific offensive player - just record the defensive play
+                                await recordEvent(pendingDefensiveEventConfirmed.eventType, pendingDefensiveEventConfirmed.playerId, undefined, true)
+                                setShowOffensiveCauseSelection(false)
+                                setPendingDefensiveEventConfirmed(null)
+                                setPendingBlockPlayer(null)
+                                setPendingDefensiveEventType(null)
+                              } catch (error: any) {
+                                console.error('Error recording event:', error)
+                                alert(`Failed to record event: ${error?.message || 'Unknown error'}`)
+                              }
                             }
                           }}
                           className="secondary-button"
