@@ -40,21 +40,40 @@ FST is a mobile app developed to help keep track of statistics of frisbee player
 ✔ **Deliverable**
 - Can start a point and assign active players
 
-### (CURRENT) PHASE 3 — Stat Entry UI (Week 3)
+### (DONE) PHASE 3 — Stat Entry UI (Week 3)
 
 🔧 **Backend**
-- Create events table
-- API to insert events (goal, assist, turn, D)
+- Create events table with comprehensive event tracking
+- Support for multiple event types: `goal`, `assist`, `throwaway`, `drop`, `stall`, `block`, `interception`, `callahan`
+- Turnover tracking system: `is_turnover` boolean flag separates outcomes (turnovers) from actions (defensive plays)
+- Team tracking: `team_id` column links events to teams
+- Migration system for schema evolution
 
-🖥️ **UI**
-- Live point tracker
-- Show active players
-- Tap player → stat buttons
-- Save event to Supabase
-- Undo last event
+🖥️ **UI Features**
+- **Live Point Tracker**: Real-time stat entry during active points
+- **Player Selection**: Tap player → stat buttons modal
+- **Offense/Defense Labels**: Dynamic labels showing which team has possession
+- **Smart Stat Filtering**: 
+  - Offense players can record: Goal, Throwaway, Drop, Stall
+  - Defense players can record: Block/D, Interception, Callahan
+- **Possession Tracking**: Automatically tracks possession changes through turnovers
+- **Turnover Confirmation Flow**:
+  - For blocks/interceptions: Ask "Did possession change?"
+  - If yes: Option to attribute to offensive player (throwaway) or record as great defensive play
+- **Callahan Logic**:
+  - Records callahan (defensive play)
+  - Automatically records goal for the same player
+  - Automatically completes the point for the defender's team
+  - Option to attribute to offensive throwaway
+- **Score Display**: Shows scores (e.g., "0-0", "1-0") instead of just point numbers
+- **Event History**: Chronological list of all events with descriptions
+- **Undo Last Event**: Remove the most recent event
+- **Validation**: Prevents invalid stat combinations (e.g., defense scoring without turnover)
 
 ✔ **Deliverable**
-- Can fully capture stats during a live point
+- Can fully capture stats during a live point with proper turnover tracking
+- Distinguishes between defensive actions (blocks/interceptions) and turnover outcomes
+- Supports all standard ultimate frisbee stat types
 
 ### PHASE 4 — Score, Summaries & Plus/Minus (Week 4)
 
