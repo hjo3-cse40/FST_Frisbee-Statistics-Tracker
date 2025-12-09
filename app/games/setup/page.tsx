@@ -15,8 +15,16 @@ export default function GameSetupPage() {
   const [teams, setTeams] = useState<Team[]>([])
   const [homeTeamId, setHomeTeamId] = useState<string>('')
   const [awayTeamId, setAwayTeamId] = useState<string>('')
+  const [pullingTeamId, setPullingTeamId] = useState<string>('')
   const [gameLocation, setGameLocation] = useState('')
   const [gameName, setGameName] = useState('')
+
+  // Set default pulling team when both teams are selected
+  useEffect(() => {
+    if (homeTeamId && awayTeamId && !pullingTeamId) {
+      setPullingTeamId(homeTeamId) // Default to home team pulling first
+    }
+  }, [homeTeamId, awayTeamId, pullingTeamId])
 
   useEffect(() => {
     loadTeams()
@@ -47,10 +55,16 @@ export default function GameSetupPage() {
       return
     }
 
+    if (!pullingTeamId) {
+      alert('Please select which team pulls first')
+      return
+    }
+
     try {
       const gameData: any = {
         team_home_id: homeTeamId,
         team_away_id: awayTeamId,
+        pulling_team_id: pullingTeamId,
         home_score: 0,
         away_score: 0,
         location: gameLocation.trim() || null
@@ -159,6 +173,38 @@ export default function GameSetupPage() {
           </div>
         </div>
 
+        {homeTeamId && awayTeamId && (
+          <div className="team-selection-group" style={{ marginTop: '2rem' }}>
+            <h2>Pulling Team (Pulls First)</h2>
+            <p style={{ fontSize: '0.875rem', color: '#6b7280', marginBottom: '1rem' }}>
+              Select which team pulls first. After that, the team that scores each point will pull the next point.
+            </p>
+            <div className="team-options">
+              {[homeTeamId, awayTeamId].map(teamId => {
+                const team = teams.find(t => t.id === teamId)
+                if (!team) return null
+                return (
+                  <button
+                    key={teamId}
+                    className={`team-option ${pullingTeamId === teamId ? 'selected' : ''}`}
+                    onClick={() => setPullingTeamId(teamId)}
+                    style={{
+                      borderColor: pullingTeamId === teamId ? team.color_primary : '#e5e7eb',
+                      backgroundColor: pullingTeamId === teamId ? `${team.color_primary}20` : 'transparent'
+                    }}
+                  >
+                    <div
+                      className="team-option-color"
+                      style={{ backgroundColor: team.color_primary }}
+                    />
+                    <span>{team.name}</span>
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+        )}
+
         {teams.length === 0 && (
           <div className="empty-state-container">
             <p>No teams available. Please create teams first.</p>
@@ -171,7 +217,7 @@ export default function GameSetupPage() {
         {teams.length > 0 && (
           <button
             onClick={createGame}
-            disabled={!homeTeamId || !awayTeamId}
+            disabled={!homeTeamId || !awayTeamId || !pullingTeamId}
             className="primary-button large"
           >
             Start Game
