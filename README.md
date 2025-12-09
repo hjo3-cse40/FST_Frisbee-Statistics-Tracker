@@ -1,12 +1,12 @@
-# FST_Frisbee Statistics Tracker
+# FST (Frisbee Statistics Tracker)
 
-![FST Logo](./public/fst-logo.png)
+![FST Logo](./public/fst-logo-dark.png)
 
 FST is a mobile app developed to help keep track of statistics of frisbee players in real time using a mobile phone or tablet.
 
 ## Development Phases
 
-### PHASE 1 — Core Foundation (Week 1)
+### (DONE) PHASE 1 — Core Foundation (Week 1)
 
 🔧 **Setup & Database**
 - Create Next.js project
@@ -26,7 +26,7 @@ FST is a mobile app developed to help keep track of statistics of frisbee player
 - App runs locally
 - Can add teams/players/games
 
-### PHASE 2 — Points + Lineups (Week 2)
+### (DONE) PHASE 2 — Points + Lineups (Week 2)
 
 🔧 **Backend**
 - Create points table
@@ -42,7 +42,7 @@ FST is a mobile app developed to help keep track of statistics of frisbee player
 ✔ **Deliverable**
 - Can start a point and assign active players
 
-### PHASE 3 — Stat Entry UI (Week 3)
+### (CURRENT) PHASE 3 — Stat Entry UI (Week 3)
 
 🔧 **Backend**
 - Create events table
