@@ -39,9 +39,26 @@ Creates the `events` table which stores all stat events (goals, assists, turnove
 
 **Important:** Run this migration before using Phase 3 features. The app will fail if the events table doesn't exist.
 
+### `add_turnover_tracking.sql` (Turnover Tracking Update)
+
+Adds support for tracking turnovers vs blocks/defensive plays with proper separation.
+
+**What it adds:**
+- `is_turnover` boolean column - indicates if possession changed
+- `team_id` column - tracks which team the event belongs to
+- Indexes on `team_id` and `is_turnover` for faster queries
+- Updates existing data to set `is_turnover` based on event type
+- Updates existing data to set `team_id` based on player's team
+
+**Important:** Run this migration after `create_events_table.sql`. This enables the new turnover tracking system where:
+- Turnover is an **outcome** (possession changed) tracked via `is_turnover` flag
+- Block/D is an **action** (defensive play) tracked via `event_type`
+- A block can cause a turnover (is_turnover = true) or not (is_turnover = false)
+
 ## Verification
 
 After running the migration, you can verify it worked by:
 
 1. Checking the Supabase dashboard → Table Editor → `events` table should appear
 2. Or running the test page at `/test-db` (if you have one set up)
+

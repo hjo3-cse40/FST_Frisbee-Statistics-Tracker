@@ -40,10 +40,12 @@ interface Point {
 interface Event {
   id: string
   point_id: string
-  event_type: 'goal' | 'turnover' | 'd'
+  event_type: 'goal' | 'turnover' | 'd' | 'block' | 'throwaway' | 'drop' | 'stall' | 'interception' | 'callahan'
   player_id: string
   assist_player_id: string | null
   sequence_number: number
+  is_turnover: boolean
+  team_id: string | null
   created_at: string
 }
 
@@ -71,6 +73,11 @@ export default function GamePage({ params }: { params: { id: string } }) {
   const [showStatButtons, setShowStatButtons] = useState<string | null>(null)
   const [showAssistSelection, setShowAssistSelection] = useState(false)
   const [pendingGoalPlayer, setPendingGoalPlayer] = useState<string | null>(null)
+  const [showTurnoverConfirmation, setShowTurnoverConfirmation] = useState(false)
+  const [pendingBlockPlayer, setPendingBlockPlayer] = useState<string | null>(null)
+  const [pendingDefensiveEventType, setPendingDefensiveEventType] = useState<'block' | 'interception' | 'callahan' | null>(null)
+  const [showOffensiveCauseSelection, setShowOffensiveCauseSelection] = useState(false)
+  const [pendingDefensiveEventConfirmed, setPendingDefensiveEventConfirmed] = useState<{ playerId: string, eventType: 'block' | 'interception' | 'callahan', isTurnover: boolean } | null>(null)
 
   useEffect(() => {
     loadGame()
@@ -177,23 +184,69 @@ export default function GamePage({ params }: { params: { id: string } }) {
     }
   }
 
-  const recordEvent = async (eventType: 'goal' | 'turnover' | 'd', playerId: string, assistPlayerId?: string) => {
+  const recordEvent = async (
+    eventType: 'goal' | 'turnover' | 'd' | 'block' | 'throwaway' | 'drop' | 'stall' | 'interception' | 'callahan',
+    playerId: string,
+    assistPlayerId?: string,
+    isTurnover?: boolean
+  ) => {
     if (!activePoint || !game) return
+
+    const player = activePointPlayers.find(p => p.id === playerId)
+    if (!player) return
+
+    // Determine if this is a turnover based on event type and explicit flag
+    let finalIsTurnover = false
+    if (isTurnover !== undefined) {
+      finalIsTurnover = isTurnover
+    } else {
+      // Auto-detect turnover status based on event type
+      switch (eventType) {
+        case 'goal':
+          finalIsTurnover = false // Goals end possession but aren't turnovers
+          break
+        case 'turnover':
+        case 'throwaway':
+        case 'drop':
+        case 'stall':
+          finalIsTurnover = true
+          break
+        case 'd':
+        case 'block':
+        case 'interception':
+        case 'callahan':
+          // For defensive plays, default to true (most blocks cause turnovers)
+          // But allow override via isTurnover parameter
+          finalIsTurnover = true
+          break
+        default:
+          finalIsTurnover = false
+      }
+    }
 
     // If recording a goal, validate that pulling team can't score without receiving team turning over
     if (eventType === 'goal') {
-      const player = activePointPlayers.find(p => p.id === playerId)
-      if (!player) return
-
       const { pullingTeamId, receivingTeamId } = getPullingAndReceivingTeams()
       
       // If the scoring player is on the pulling team (defense)
       if (pullingTeamId && player.team_id === pullingTeamId) {
         // Check if receiving team has any turnovers
+        // This includes:
+        // 1. Turnovers by receiving team players (throwaway, drop, stall)
+        // 2. Blocks/interceptions by pulling team (defense gets block/interception = receiving team loses possession)
         const receivingTeamTurnovers = events.filter(e => {
-          if (e.event_type !== 'turnover') return false
+          if (!e.is_turnover) return false
+          
           const turnoverPlayer = activePointPlayers.find(p => p.id === e.player_id)
-          return turnoverPlayer && turnoverPlayer.team_id === receivingTeamId
+          if (!turnoverPlayer) return false
+          
+          // If it's a block, interception, or callahan by the pulling team, it counts as a turnover by the receiving team
+          if ((e.event_type === 'interception' || e.event_type === 'block' || e.event_type === 'd' || e.event_type === 'callahan') && turnoverPlayer.team_id === pullingTeamId) {
+            return true
+          }
+          
+          // Otherwise, check if the turnover was by a receiving team player
+          return turnoverPlayer.team_id === receivingTeamId
         })
 
         if (receivingTeamTurnovers.length === 0) {
@@ -210,11 +263,19 @@ export default function GamePage({ params }: { params: { id: string } }) {
         ? Math.max(...events.map(e => e.sequence_number)) + 1 
         : 1
 
+      // Map old event types to new ones for backward compatibility
+      let mappedEventType = eventType
+      if (eventType === 'd') {
+        mappedEventType = 'block' // Map old 'd' to 'block'
+      }
+
       const eventData: any = {
         point_id: activePoint.id,
-        event_type: eventType,
+        event_type: mappedEventType,
         player_id: playerId,
-        sequence_number: nextSequence
+        sequence_number: nextSequence,
+        is_turnover: finalIsTurnover,
+        team_id: player.team_id
       }
 
       if (eventType === 'goal' && assistPlayerId) {
@@ -234,6 +295,11 @@ export default function GamePage({ params }: { params: { id: string } }) {
       setShowStatButtons(null)
       setShowAssistSelection(false)
       setPendingGoalPlayer(null)
+      setShowTurnoverConfirmation(false)
+      setPendingBlockPlayer(null)
+      setPendingDefensiveEventType(null)
+      setShowOffensiveCauseSelection(false)
+      setPendingDefensiveEventConfirmed(null)
     } catch (error: any) {
       console.error('Error recording event:', error)
       alert(`Failed to record event: ${error?.message || 'Unknown error'}`)
@@ -264,13 +330,161 @@ export default function GamePage({ params }: { params: { id: string } }) {
     setShowStatButtons(playerId)
     setShowAssistSelection(false)
     setPendingGoalPlayer(null)
+    setShowTurnoverConfirmation(false)
+    setPendingBlockPlayer(null)
+    setPendingDefensiveEventType(null)
+    setShowOffensiveCauseSelection(false)
+    setPendingDefensiveEventConfirmed(null)
+  }
+
+  const handleBlockClick = (playerId: string) => {
+    // Check if player is on defense (pulling team)
+    const player = activePointPlayers.find(p => p.id === playerId)
+    if (!player) return
+
+    const { pullingTeamId } = getPullingAndReceivingTeams()
+    
+    // If player is on defense, blocks typically cause turnovers
+    // Show confirmation dialog to ask if possession changed
+    if (pullingTeamId && player.team_id === pullingTeamId) {
+      setPendingBlockPlayer(playerId)
+      setPendingDefensiveEventType('block')
+      setShowTurnoverConfirmation(true)
+      setShowStatButtons(null)
+    } else {
+      // If player is on offense, this is unusual but allow it
+      // Default to turnover = true for blocks
+      recordEvent('block', playerId, undefined, true)
+    }
+  }
+
+  const handleInterceptionClick = (playerId: string) => {
+    // Check if player is on defense (pulling team)
+    const player = activePointPlayers.find(p => p.id === playerId)
+    if (!player) return
+
+    const { pullingTeamId } = getPullingAndReceivingTeams()
+    
+    // Interceptions always cause turnovers, but ask if someone caused it with a bad throw
+    if (pullingTeamId && player.team_id === pullingTeamId) {
+      setPendingBlockPlayer(playerId)
+      setPendingDefensiveEventType('interception')
+      setShowTurnoverConfirmation(true)
+      setShowStatButtons(null)
+    } else {
+      // If player is on offense, this is unusual but allow it
+      recordEvent('interception', playerId, undefined, true)
+    }
+  }
+
+  const handleCallahanClick = async (playerId: string, offensivePlayerId?: string) => {
+    if (!activePoint || !game) return
+    
+    const player = activePointPlayers.find(p => p.id === playerId)
+    if (!player) return
+
+    try {
+      // Get current events to determine sequence numbers
+      const { data: currentEvents, error: eventsError } = await supabase
+        .from('events')
+        .select('*')
+        .eq('point_id', activePoint.id)
+        .order('sequence_number', { ascending: true })
+
+      if (eventsError) throw eventsError
+      
+      let nextSequence = currentEvents && currentEvents.length > 0 
+        ? Math.max(...currentEvents.map((e: Event) => e.sequence_number)) + 1 
+        : 1
+
+      // Record throwaway on offensive player if specified
+      if (offensivePlayerId) {
+        const throwawayData: any = {
+          point_id: activePoint.id,
+          event_type: 'throwaway',
+          player_id: offensivePlayerId,
+          sequence_number: nextSequence++,
+          is_turnover: true,
+          team_id: activePointPlayers.find(p => p.id === offensivePlayerId)?.team_id
+        }
+        
+        const { error: throwawayError } = await supabase
+          .from('events')
+          .insert([throwawayData])
+        
+        if (throwawayError) throw throwawayError
+      }
+      
+      // Record callahan (defensive play) - this is a turnover
+      const callahanData: any = {
+        point_id: activePoint.id,
+        event_type: 'callahan',
+        player_id: playerId,
+        sequence_number: nextSequence++,
+        is_turnover: true,
+        team_id: player.team_id
+      }
+      
+      const { error: callahanError } = await supabase
+        .from('events')
+        .insert([callahanData])
+      
+      if (callahanError) throw callahanError
+      
+      // Record goal for the same player (callahan = goal)
+      const goalData: any = {
+        point_id: activePoint.id,
+        event_type: 'goal',
+        player_id: playerId,
+        sequence_number: nextSequence++,
+        is_turnover: false,
+        team_id: player.team_id
+      }
+      
+      const { error: goalError } = await supabase
+        .from('events')
+        .insert([goalData])
+      
+      if (goalError) throw goalError
+      
+      // Fetch events fresh from database to ensure completePoint has latest data
+      const { data: updatedEvents, error: updatedEventsError } = await supabase
+        .from('events')
+        .select('*')
+        .eq('point_id', activePoint.id)
+        .order('sequence_number', { ascending: true })
+
+      if (updatedEventsError) throw updatedEventsError
+      
+      // Reload events to update state
+      await loadActivePointData(activePoint.id)
+      
+      // Automatically complete the point for the defender's team
+      // Pass fresh events to avoid state timing issues
+      await completePoint(player.team_id, updatedEvents as Event[])
+      
+      // Close any open modals
+      setShowStatButtons(null)
+      setShowOffensiveCauseSelection(false)
+      setPendingDefensiveEventConfirmed(null)
+      setPendingBlockPlayer(null)
+      setPendingDefensiveEventType(null)
+    } catch (error: any) {
+      console.error('Error recording callahan:', error)
+      alert(`Failed to record callahan: ${error?.message || 'Unknown error'}`)
+    }
   }
 
   const getPlayerStats = (playerId: string) => {
     const goals = events.filter(e => e.event_type === 'goal' && e.player_id === playerId).length
     const assists = events.filter(e => e.event_type === 'goal' && e.assist_player_id === playerId).length
-    const turnovers = events.filter(e => e.event_type === 'turnover' && e.player_id === playerId).length
-    const ds = events.filter(e => e.event_type === 'd' && e.player_id === playerId).length
+    // Turnovers: count events where this player caused a turnover
+    const turnovers = events.filter(e => e.is_turnover && e.player_id === playerId).length
+    // Blocks/Ds: count defensive plays (block, d, interception, callahan)
+    const ds = events.filter(e => 
+      (e.event_type === 'block' || e.event_type === 'd' || e.event_type === 'interception' || e.event_type === 'callahan') 
+      && e.player_id === playerId
+    ).length
     
     return { goals, assists, turnovers, ds }
   }
@@ -296,6 +510,46 @@ export default function GamePage({ params }: { params: { id: string } }) {
     return { pullingTeamId, receivingTeamId }
   }
 
+  // Determine which team currently has possession (is on offense)
+  const getCurrentPossession = () => {
+    const { pullingTeamId, receivingTeamId } = getPullingAndReceivingTeams()
+    if (!pullingTeamId || !receivingTeamId) return { offenseTeamId: null, defenseTeamId: null }
+    
+    // Start with receiving team on offense
+    let offenseTeamId = receivingTeamId
+    let defenseTeamId = pullingTeamId
+    
+    // Track possession changes through turnovers
+    // Sort events by sequence to process chronologically
+    const sortedEvents = [...events].sort((a, b) => a.sequence_number - b.sequence_number)
+    
+    for (const event of sortedEvents) {
+      if (event.is_turnover) {
+        const eventPlayer = activePointPlayers.find(p => p.id === event.player_id)
+        if (!eventPlayer) continue
+        
+        // If it's a defensive play (block/interception/callahan) by the defense team, offense loses possession
+        if ((event.event_type === 'block' || event.event_type === 'd' || event.event_type === 'interception' || event.event_type === 'callahan') 
+            && eventPlayer.team_id === defenseTeamId) {
+          // Defense got the turnover, so they now have possession
+          const temp = offenseTeamId
+          offenseTeamId = defenseTeamId
+          defenseTeamId = temp
+        } 
+        // If it's an offensive mistake (throwaway/drop/stall) by the offense team, they lose possession
+        else if ((event.event_type === 'throwaway' || event.event_type === 'drop' || event.event_type === 'stall') 
+                 && eventPlayer.team_id === offenseTeamId) {
+          // Offense turned it over, so defense now has possession
+          const temp = offenseTeamId
+          offenseTeamId = defenseTeamId
+          defenseTeamId = temp
+        }
+      }
+    }
+    
+    return { offenseTeamId, defenseTeamId }
+  }
+
   const handleGoalClick = (playerId: string) => {
     // For goals, we need to check if there are other players on the same team
     // who could have assisted
@@ -317,41 +571,58 @@ export default function GamePage({ params }: { params: { id: string } }) {
     }
   }
 
-  const completePoint = async (scoringTeamId: string) => {
+  const completePoint = async (scoringTeamId: string, eventsOverride?: Event[]) => {
     if (!activePoint || !game) return
 
-    // Validate that there is at least one goal with an assist
-    const goalEvents = events.filter(e => e.event_type === 'goal')
+    // Use provided events or fall back to state
+    const eventsToCheck = eventsOverride || events
+
+    // Validate that there is at least one goal with an assist (or a callahan, which doesn't need an assist)
+    const goalEvents = eventsToCheck.filter(e => e.event_type === 'goal')
+    const callahanEvents = eventsToCheck.filter(e => e.event_type === 'callahan')
     
-    if (goalEvents.length === 0) {
+    if (goalEvents.length === 0 && callahanEvents.length === 0) {
       alert('Cannot complete point: No goal has been recorded. Please record at least one goal before completing the point.')
       return
     }
 
-    // Check if at least one goal has an assist
+    // Check if at least one goal has an assist (callahans don't need assists)
     const goalsWithAssists = goalEvents.filter(e => e.assist_player_id !== null)
     
-    if (goalsWithAssists.length === 0) {
+    if (goalsWithAssists.length === 0 && callahanEvents.length === 0) {
       alert('Cannot complete point: No goal has an assist recorded. Please record a goal with an assist before completing the point.')
       return
     }
 
-    // Validate that if pulling team scored, receiving team had a turnover
-    const { pullingTeamId, receivingTeamId } = getPullingAndReceivingTeams()
-    
-    if (pullingTeamId && scoringTeamId === pullingTeamId) {
-      const receivingTeamTurnovers = events.filter(e => {
-        if (e.event_type !== 'turnover') return false
-        const turnoverPlayer = activePointPlayers.find(p => p.id === e.player_id)
-        return turnoverPlayer && turnoverPlayer.team_id === receivingTeamId
-      })
+        // Validate that if pulling team scored, receiving team had a turnover
+        const { pullingTeamId, receivingTeamId } = getPullingAndReceivingTeams()
+        
+        if (pullingTeamId && scoringTeamId === pullingTeamId) {
+          // Check if receiving team has any turnovers
+          // This includes:
+          // 1. Turnovers by receiving team players (throwaway, drop, stall)
+          // 2. Blocks/interceptions by pulling team (defense gets block/interception = receiving team loses possession)
+          const receivingTeamTurnovers = eventsToCheck.filter(e => {
+            if (!e.is_turnover) return false
+            
+            const turnoverPlayer = activePointPlayers.find(p => p.id === e.player_id)
+            if (!turnoverPlayer) return false
+            
+            // If it's a block, interception, or callahan by the pulling team, it counts as a turnover by the receiving team
+            if ((e.event_type === 'interception' || e.event_type === 'block' || e.event_type === 'd' || e.event_type === 'callahan') && turnoverPlayer.team_id === pullingTeamId) {
+              return true
+            }
+            
+            // Otherwise, check if the turnover was by a receiving team player
+            return turnoverPlayer.team_id === receivingTeamId
+          })
 
-      if (receivingTeamTurnovers.length === 0) {
-        const receivingTeam = receivingTeamId === game.team_home_id ? homeTeam : awayTeam
-        alert(`Cannot complete point: ${receivingTeam?.name || 'The receiving team'} must have at least one turnover before the pulling team can score.`)
-        return
-      }
-    }
+          if (receivingTeamTurnovers.length === 0) {
+            const receivingTeam = receivingTeamId === game.team_home_id ? homeTeam : awayTeam
+            alert(`Cannot complete point: ${receivingTeam?.name || 'The receiving team'} must have at least one turnover before the pulling team can score.`)
+            return
+          }
+        }
 
     try {
       // Update the point to mark it as scored
@@ -646,35 +917,63 @@ export default function GamePage({ params }: { params: { id: string } }) {
           <div style={{ marginTop: '2rem' }}>
             <h3 style={{ marginBottom: '1rem' }}>Points ({points.length})</h3>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-              {points.map(point => (
-                <div
-                  key={point.id}
-                  onClick={() => {
-                    if (!point.scoring_team_id) {
-                      setActivePoint(point)
-                      loadActivePointData(point.id)
-                    }
-                  }}
-                  style={{
-                    padding: '1rem',
-                    border: '1px solid #e5e7eb',
-                    borderRadius: '0.5rem',
-                    backgroundColor: point.id === activePoint?.id ? '#dbeafe' : '#f9fafb',
-                    cursor: !point.scoring_team_id ? 'pointer' : 'default'
-                  }}
-                >
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <span style={{ fontWeight: 600 }}>Point {point.point_number}</span>
-                    {point.scoring_team_id ? (
-                      <span style={{ fontSize: '0.875rem', color: '#6b7280' }}>
-                        Scored by {point.scoring_team_id === game.team_home_id ? homeTeam?.name : awayTeam?.name}
+              {points.map(point => {
+                // Calculate score at the start of this point
+                let homeScore = 0
+                let awayScore = 0
+                
+                // Count points scored before this point
+                const previousPoints = points.filter(p => p.point_number < point.point_number && p.scoring_team_id)
+                previousPoints.forEach(p => {
+                  if (p.scoring_team_id === game.team_home_id) {
+                    homeScore++
+                  } else if (p.scoring_team_id === game.team_away_id) {
+                    awayScore++
+                  }
+                })
+                
+                // If this point is completed, include it in the score
+                if (point.scoring_team_id) {
+                  if (point.scoring_team_id === game.team_home_id) {
+                    homeScore++
+                  } else if (point.scoring_team_id === game.team_away_id) {
+                    awayScore++
+                  }
+                }
+                
+                return (
+                  <div
+                    key={point.id}
+                    onClick={() => {
+                      if (!point.scoring_team_id) {
+                        setActivePoint(point)
+                        loadActivePointData(point.id)
+                      }
+                    }}
+                    style={{
+                      padding: '1rem',
+                      border: '1px solid #e5e7eb',
+                      borderRadius: '0.5rem',
+                      backgroundColor: point.id === activePoint?.id ? '#dbeafe' : '#f9fafb',
+                      cursor: !point.scoring_team_id ? 'pointer' : 'default'
+                    }}
+                  >
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <span style={{ fontWeight: 600 }}>
+                        {homeScore}-{awayScore}
+                        {!point.scoring_team_id && <span style={{ fontSize: '0.875rem', fontWeight: 'normal', color: '#9ca3af', marginLeft: '0.5rem' }}>(Point {point.point_number})</span>}
                       </span>
-                    ) : (
-                      <span style={{ fontSize: '0.875rem', color: '#9ca3af' }}>In progress</span>
-                    )}
+                      {point.scoring_team_id ? (
+                        <span style={{ fontSize: '0.875rem', color: '#6b7280' }}>
+                          Scored by {point.scoring_team_id === game.team_home_id ? homeTeam?.name : awayTeam?.name}
+                        </span>
+                      ) : (
+                        <span style={{ fontSize: '0.875rem', color: '#9ca3af' }}>In progress</span>
+                      )}
+                    </div>
                   </div>
-                </div>
-              ))}
+                )
+              })}
             </div>
           </div>
         )}
@@ -690,7 +989,24 @@ export default function GamePage({ params }: { params: { id: string } }) {
           backgroundColor: '#f0f9ff'
         }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', flexWrap: 'wrap', gap: '0.5rem' }}>
-            <h2 style={{ margin: 0 }}>Live Point {activePoint.point_number}</h2>
+            {(() => {
+              // Calculate score at the start of this point
+              let homeScore = 0
+              let awayScore = 0
+              
+              const previousPoints = points.filter(p => p.point_number < activePoint.point_number && p.scoring_team_id)
+              previousPoints.forEach(p => {
+                if (p.scoring_team_id === game.team_home_id) {
+                  homeScore++
+                } else if (p.scoring_team_id === game.team_away_id) {
+                  awayScore++
+                }
+              })
+              
+              return (
+                <h2 style={{ margin: 0 }}>Live Point: {homeScore}-{awayScore}</h2>
+              )
+            })()}
             <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', alignItems: 'center' }}>
               {(() => {
                 const goalEvents = events.filter(e => e.event_type === 'goal')
@@ -792,6 +1108,28 @@ export default function GamePage({ params }: { params: { id: string } }) {
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
               {/* Home Team Players */}
               <div>
+                {(() => {
+                  const { offenseTeamId, defenseTeamId } = getCurrentPossession()
+                  const isOffense = offenseTeamId === game.team_home_id
+                  const isDefense = defenseTeamId === game.team_home_id
+                  
+                  return (
+                    <>
+                      {(isOffense || isDefense) && (
+                        <div style={{
+                          fontSize: '0.75rem',
+                          fontWeight: 700,
+                          textTransform: 'uppercase',
+                          letterSpacing: '0.05em',
+                          marginBottom: '0.25rem',
+                          color: isOffense ? '#059669' : '#7c3aed'
+                        }}>
+                          {isOffense ? 'Offense' : 'Defense'}
+                        </div>
+                      )}
+                    </>
+                  )
+                })()}
                 <h4 style={{ 
                   fontSize: '0.875rem', 
                   fontWeight: 600, 
@@ -883,6 +1221,28 @@ export default function GamePage({ params }: { params: { id: string } }) {
 
               {/* Away Team Players */}
               <div>
+                {(() => {
+                  const { offenseTeamId, defenseTeamId } = getCurrentPossession()
+                  const isOffense = offenseTeamId === game.team_away_id
+                  const isDefense = defenseTeamId === game.team_away_id
+                  
+                  return (
+                    <>
+                      {(isOffense || isDefense) && (
+                        <div style={{
+                          fontSize: '0.75rem',
+                          fontWeight: 700,
+                          textTransform: 'uppercase',
+                          letterSpacing: '0.05em',
+                          marginBottom: '0.25rem',
+                          color: isOffense ? '#059669' : '#7c3aed'
+                        }}>
+                          {isOffense ? 'Offense' : 'Defense'}
+                        </div>
+                      )}
+                    </>
+                  )
+                })()}
                 <h4 style={{ 
                   fontSize: '0.875rem', 
                   fontWeight: 600, 
@@ -975,45 +1335,108 @@ export default function GamePage({ params }: { params: { id: string } }) {
           </div>
 
           {/* Stat Buttons Modal */}
-          {showStatButtons && (
-            <div className="modal-overlay" onClick={() => setShowStatButtons(null)}>
-              <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '400px' }}>
-                <h3 style={{ marginBottom: '1rem' }}>
-                  {activePointPlayers.find(p => p.id === showStatButtons)?.name || 'Player'}
-                </h3>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-                  <button
-                    onClick={() => handleGoalClick(showStatButtons)}
-                    className="primary-button"
-                    style={{ padding: '1rem', fontSize: '1rem' }}
-                  >
-                    Goal
-                  </button>
-                  <button
-                    onClick={() => recordEvent('turnover', showStatButtons)}
-                    className="secondary-button"
-                    style={{ padding: '1rem', fontSize: '1rem' }}
-                  >
-                    Turnover
-                  </button>
-                  <button
-                    onClick={() => recordEvent('d', showStatButtons)}
-                    className="secondary-button"
-                    style={{ padding: '1rem', fontSize: '1rem' }}
-                  >
-                    D (Defensive Play)
-                  </button>
-                  <button
-                    onClick={() => setShowStatButtons(null)}
-                    className="secondary-button"
-                    style={{ padding: '0.75rem', fontSize: '0.875rem', marginTop: '0.5rem' }}
-                  >
-                    Cancel
-                  </button>
+          {showStatButtons && (() => {
+            const player = activePointPlayers.find(p => p.id === showStatButtons)
+            if (!player) return null
+            
+            const { offenseTeamId, defenseTeamId } = getCurrentPossession()
+            const isOnOffense = offenseTeamId === player.team_id
+            const isOnDefense = defenseTeamId === player.team_id
+            
+            return (
+              <div className="modal-overlay" onClick={() => setShowStatButtons(null)}>
+                <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '400px' }}>
+                  <h3 style={{ marginBottom: '1rem' }}>
+                    {player.name || 'Player'}
+                  </h3>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                    {/* Offense-only stats */}
+                    {isOnOffense && (
+                      <>
+                        <button
+                          onClick={() => handleGoalClick(showStatButtons)}
+                          className="primary-button"
+                          style={{ padding: '1rem', fontSize: '1rem' }}
+                        >
+                          Goal
+                        </button>
+                        <button
+                          onClick={() => recordEvent('throwaway', showStatButtons)}
+                          className="secondary-button"
+                          style={{ padding: '1rem', fontSize: '1rem' }}
+                        >
+                          Throwaway
+                        </button>
+                        <button
+                          onClick={() => recordEvent('drop', showStatButtons)}
+                          className="secondary-button"
+                          style={{ padding: '1rem', fontSize: '1rem' }}
+                        >
+                          Drop
+                        </button>
+                        <button
+                          onClick={() => recordEvent('stall', showStatButtons)}
+                          className="secondary-button"
+                          style={{ padding: '1rem', fontSize: '1rem' }}
+                        >
+                          Stall
+                        </button>
+                      </>
+                    )}
+                    
+                    {/* Defense-only stats */}
+                    {isOnDefense && (
+                      <>
+                        <button
+                          onClick={() => handleBlockClick(showStatButtons)}
+                          className="secondary-button"
+                          style={{ padding: '1rem', fontSize: '1rem', backgroundColor: '#7c3aed', color: 'white' }}
+                        >
+                          Block / D
+                        </button>
+                        <button
+                          onClick={() => handleInterceptionClick(showStatButtons)}
+                          className="secondary-button"
+                          style={{ padding: '1rem', fontSize: '1rem', backgroundColor: '#059669', color: 'white' }}
+                        >
+                          Interception
+                        </button>
+                        <button
+                          onClick={() => {
+                            // Callahan: ask if someone caused it, then record callahan + goal + complete point
+                            const { pullingTeamId } = getPullingAndReceivingTeams()
+                            
+                            // Callahans are always by the defense
+                            if (pullingTeamId && player.team_id === pullingTeamId) {
+                              setPendingBlockPlayer(showStatButtons)
+                              setPendingDefensiveEventType('callahan')
+                              setShowTurnoverConfirmation(true)
+                              setShowStatButtons(null)
+                            } else {
+                              // If somehow on offense, still allow it
+                              handleCallahanClick(showStatButtons)
+                            }
+                          }}
+                          className="secondary-button"
+                          style={{ padding: '1rem', fontSize: '1rem', backgroundColor: '#dc2626', color: 'white' }}
+                        >
+                          Callahan
+                        </button>
+                      </>
+                    )}
+                    
+                    <button
+                      onClick={() => setShowStatButtons(null)}
+                      className="secondary-button"
+                      style={{ padding: '0.75rem', fontSize: '0.875rem', marginTop: '0.5rem' }}
+                    >
+                      Cancel
+                    </button>
+                  </div>
                 </div>
               </div>
-            </div>
-          )}
+            )
+          })()}
 
           {/* Assist Selection Modal */}
           {showAssistSelection && pendingGoalPlayer && (
@@ -1064,6 +1487,173 @@ export default function GamePage({ params }: { params: { id: string } }) {
             </div>
           )}
 
+          {/* Turnover Confirmation Modal for Blocks/Interceptions/Callahans */}
+          {showTurnoverConfirmation && pendingBlockPlayer && pendingDefensiveEventType && (
+            <div className="modal-overlay" onClick={() => {
+              setShowTurnoverConfirmation(false)
+              setPendingBlockPlayer(null)
+              setPendingDefensiveEventType(null)
+            }}>
+              <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '400px' }}>
+                <h3 style={{ marginBottom: '1rem' }}>
+                  {pendingDefensiveEventType === 'callahan' ? 'Callahan!' : 'Did Possession Change?'}
+                </h3>
+                <p style={{ marginBottom: '1.5rem', fontSize: '0.875rem', color: '#6b7280' }}>
+                  {pendingDefensiveEventType === 'callahan' 
+                    ? `${activePointPlayers.find(p => p.id === pendingBlockPlayer)?.name || 'This player'} intercepted in the endzone for a callahan!`
+                    : `Did ${activePointPlayers.find(p => p.id === pendingBlockPlayer)?.name || 'this player'}'s ${pendingDefensiveEventType === 'block' ? 'block' : 'interception'} cause a turnover?`}
+                </p>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                  {pendingDefensiveEventType === 'callahan' ? (
+                    <>
+                      {/* For callahans, always proceed to offensive cause selection */}
+                      <button
+                        onClick={() => {
+                          setPendingDefensiveEventConfirmed({
+                            playerId: pendingBlockPlayer,
+                            eventType: 'callahan',
+                            isTurnover: true
+                          })
+                          setShowTurnoverConfirmation(false)
+                          setShowOffensiveCauseSelection(true)
+                        }}
+                        className="primary-button"
+                        style={{ padding: '1rem', fontSize: '1rem', backgroundColor: '#dc2626' }}
+                      >
+                        Continue
+                      </button>
+                    </>
+                  ) : (
+                    <>
+                      <button
+                        onClick={() => {
+                          // Yes, possession changed - now ask if someone caused it with a bad throw
+                          setPendingDefensiveEventConfirmed({
+                            playerId: pendingBlockPlayer,
+                            eventType: pendingDefensiveEventType,
+                            isTurnover: true
+                          })
+                          setShowTurnoverConfirmation(false)
+                          setShowOffensiveCauseSelection(true)
+                        }}
+                        className="primary-button"
+                        style={{ padding: '1rem', fontSize: '1rem', backgroundColor: '#dc2626' }}
+                      >
+                        Yes - Turnover ({pendingDefensiveEventType === 'block' ? 'Block' : 'Interception'} caused possession change)
+                      </button>
+                      <button
+                        onClick={() => {
+                          recordEvent(pendingDefensiveEventType, pendingBlockPlayer, undefined, false)
+                          setShowTurnoverConfirmation(false)
+                          setPendingBlockPlayer(null)
+                          setPendingDefensiveEventType(null)
+                        }}
+                        className="secondary-button"
+                        style={{ padding: '1rem', fontSize: '1rem' }}
+                      >
+                        No - No Turnover ({pendingDefensiveEventType === 'block' ? 'Block' : 'Interception'} but offense kept possession)
+                      </button>
+                    </>
+                  )}
+                  <button
+                    onClick={() => {
+                      setShowTurnoverConfirmation(false)
+                      setPendingBlockPlayer(null)
+                      setPendingDefensiveEventType(null)
+                    }}
+                    className="secondary-button"
+                    style={{ padding: '0.75rem', fontSize: '0.875rem', marginTop: '0.5rem' }}
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Offensive Cause Selection Modal */}
+          {showOffensiveCauseSelection && pendingDefensiveEventConfirmed && (
+            <div className="modal-overlay" onClick={() => {
+              setShowOffensiveCauseSelection(false)
+              setPendingDefensiveEventConfirmed(null)
+            }}>
+              <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '400px' }}>
+                <h3 style={{ marginBottom: '1rem' }}>Did Someone Cause This?</h3>
+                <p style={{ marginBottom: '1.5rem', fontSize: '0.875rem', color: '#6b7280' }}>
+                  Did someone on offense cause this {pendingDefensiveEventConfirmed.eventType === 'block' ? 'block' : pendingDefensiveEventConfirmed.eventType === 'interception' ? 'interception' : 'callahan'} with a bad throw?
+                </p>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                  {(() => {
+                    const { pullingTeamId, receivingTeamId } = getPullingAndReceivingTeams()
+                    if (!receivingTeamId) return null
+                    
+                    const offensivePlayers = activePointPlayers.filter(p => p.team_id === receivingTeamId)
+                    
+                    return (
+                      <>
+                        {offensivePlayers.map(player => (
+                          <button
+                            key={player.id}
+                            onClick={async () => {
+                              if (pendingDefensiveEventConfirmed.eventType === 'callahan') {
+                                // For callahans, use the special handler
+                                await handleCallahanClick(pendingDefensiveEventConfirmed.playerId, player.id)
+                              } else {
+                                // Record throwaway on the offensive player
+                                await recordEvent('throwaway', player.id, undefined, true)
+                                // Record the defensive play (block/interception)
+                                await recordEvent(pendingDefensiveEventConfirmed.eventType, pendingDefensiveEventConfirmed.playerId, undefined, true)
+                                setShowOffensiveCauseSelection(false)
+                                setPendingDefensiveEventConfirmed(null)
+                                setPendingBlockPlayer(null)
+                                setPendingDefensiveEventType(null)
+                              }
+                            }}
+                            className="secondary-button"
+                            style={{ padding: '0.75rem', textAlign: 'left' }}
+                          >
+                            #{player.number} {player.name} (Throwaway)
+                          </button>
+                        ))}
+                        <button
+                          onClick={async () => {
+                            if (pendingDefensiveEventConfirmed.eventType === 'callahan') {
+                              // For callahans, use the special handler
+                              await handleCallahanClick(pendingDefensiveEventConfirmed.playerId)
+                            } else {
+                              // No specific offensive player - just record the defensive play
+                              await recordEvent(pendingDefensiveEventConfirmed.eventType, pendingDefensiveEventConfirmed.playerId, undefined, true)
+                              setShowOffensiveCauseSelection(false)
+                              setPendingDefensiveEventConfirmed(null)
+                              setPendingBlockPlayer(null)
+                              setPendingDefensiveEventType(null)
+                            }
+                          }}
+                          className="secondary-button"
+                          style={{ padding: '1rem', fontSize: '1rem', backgroundColor: '#7c3aed', color: 'white' }}
+                        >
+                          No - Great Defensive Play (No offensive turnover)
+                        </button>
+                      </>
+                    )
+                  })()}
+                  <button
+                    onClick={() => {
+                      setShowOffensiveCauseSelection(false)
+                      setPendingDefensiveEventConfirmed(null)
+                      setPendingBlockPlayer(null)
+                      setPendingDefensiveEventType(null)
+                    }}
+                    className="secondary-button"
+                    style={{ padding: '0.75rem', fontSize: '0.875rem', marginTop: '0.5rem' }}
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Event History */}
           {events.length > 0 && (
             <div style={{ marginTop: '1.5rem', paddingTop: '1.5rem', borderTop: '1px solid #e5e7eb' }}>
@@ -1080,10 +1670,21 @@ export default function GamePage({ params }: { params: { id: string } }) {
                       return assistPlayer 
                         ? `Goal by #${player?.number} ${player?.name} (assist: #${assistPlayer?.number} ${assistPlayer?.name})`
                         : `Goal by #${player?.number} ${player?.name}`
+                    } else if (event.event_type === 'throwaway') {
+                      return `Throwaway by #${player?.number} ${player?.name}${event.is_turnover ? ' (Turnover)' : ''}`
+                    } else if (event.event_type === 'drop') {
+                      return `Drop by #${player?.number} ${player?.name}${event.is_turnover ? ' (Turnover)' : ''}`
+                    } else if (event.event_type === 'stall') {
+                      return `Stall by #${player?.number} ${player?.name}${event.is_turnover ? ' (Turnover)' : ''}`
+                    } else if (event.event_type === 'block' || event.event_type === 'd') {
+                      return `Block/D by #${player?.number} ${player?.name}${event.is_turnover ? ' (Turnover)' : ' (No turnover)'}`
+                    } else if (event.event_type === 'interception') {
+                      return `Interception by #${player?.number} ${player?.name}${event.is_turnover ? ' (Turnover)' : ' (No turnover)'}`
+                    } else if (event.event_type === 'callahan') {
+                      return `Callahan by #${player?.number} ${player?.name}${event.is_turnover ? ' (Turnover)' : ''}`
                     } else if (event.event_type === 'turnover') {
+                      // Legacy event type
                       return `Turnover by #${player?.number} ${player?.name}`
-                    } else if (event.event_type === 'd') {
-                      return `D by #${player?.number} ${player?.name}`
                     }
                     return 'Unknown event'
                   }
