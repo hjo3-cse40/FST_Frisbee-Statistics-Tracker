@@ -1,6 +1,8 @@
 import type { Metadata } from 'next'
 import './globals.css'
 import Footer from './components/Footer'
+import { ThemeProvider } from './components/ThemeProvider'
+import ThemeToggle from './components/ThemeToggle'
 
 export const metadata: Metadata = {
   title: 'FST Frisbee Statistics Tracker',
@@ -13,12 +15,15 @@ export default function RootLayout({
   children: React.ReactNode
 }) {
   return (
-    <html lang="en">
+    <html lang="en" suppressHydrationWarning>
       <body>
-        <div className="layout-wrapper">
-          <main>{children}</main>
-          <Footer />
-        </div>
+        <ThemeProvider>
+          <ThemeToggle />
+          <div className="layout-wrapper">
+            <main>{children}</main>
+            <Footer />
+          </div>
+        </ThemeProvider>
       </body>
     </html>
   )

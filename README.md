@@ -1,4 +1,7 @@
 # FST_Frisbee Statistics Tracker
+
+![FST Logo](./public/fst-logo.png)
+
 FST is a mobile app developed to help keep track of statistics of frisbee players in real time using a mobile phone or tablet.
 
 ## Development Phases

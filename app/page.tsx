@@ -1,12 +1,15 @@
 import Link from 'next/link'
+import Image from 'next/image'
+import Logo from './components/Logo'
 
 export default function HomePage() {
   return (
     <div className="container">
-      <div className="header">
-        <h1>FST</h1>
-        <p className="subtitle">Frisbee Statistics Tracker</p>
-      </div>
+      <Link href="/" style={{ display: 'block', textDecoration: 'none', marginBottom: '2rem' }}>
+        <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
+          <Logo />
+        </div>
+      </Link>
       
       <div className="nav-cards">
         <Link href="/games/setup" className="nav-card">

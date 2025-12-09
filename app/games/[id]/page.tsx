@@ -2,7 +2,9 @@
 
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
+import Image from 'next/image'
 import { supabase } from '@/lib/supabase'
+import Logo from '@/app/components/Logo'
 
 interface Game {
   id: string
@@ -868,6 +870,11 @@ export default function GamePage({ params }: { params: { id: string } }) {
   if (!game) {
     return (
       <div className="container">
+      <Link href="/" style={{ display: 'block', textDecoration: 'none', marginBottom: '1.5rem' }}>
+        <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
+          <Logo />
+        </div>
+      </Link>
         <p>Game not found</p>
         <Link href="/" className="primary-button">
           Go Home
@@ -878,6 +885,11 @@ export default function GamePage({ params }: { params: { id: string } }) {
 
   return (
     <div className="container">
+      <Link href="/" style={{ display: 'block', textDecoration: 'none', marginBottom: '1.5rem' }}>
+        <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
+          <Logo />
+        </div>
+      </Link>
       <div className="header">
         <Link href="/" className="back-button">← Back</Link>
         <h1>{game.name || game.location || 'Game'}</h1>
@@ -954,21 +966,21 @@ export default function GamePage({ params }: { params: { id: string } }) {
                       padding: '1rem',
                       border: '1px solid #e5e7eb',
                       borderRadius: '0.5rem',
-                      backgroundColor: point.id === activePoint?.id ? '#dbeafe' : '#f9fafb',
+                      backgroundColor: point.id === activePoint?.id ? 'rgba(59, 130, 246, 0.1)' : 'var(--bg-tertiary)',
                       cursor: !point.scoring_team_id ? 'pointer' : 'default'
                     }}
                   >
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                       <span style={{ fontWeight: 600 }}>
                         {homeScore}-{awayScore}
-                        {!point.scoring_team_id && <span style={{ fontSize: '0.875rem', fontWeight: 'normal', color: '#9ca3af', marginLeft: '0.5rem' }}>(Point {point.point_number})</span>}
+                        {!point.scoring_team_id && <span style={{ fontSize: '0.875rem', fontWeight: 'normal', color: 'var(--text-quaternary)', marginLeft: '0.5rem' }}>(Point {point.point_number})</span>}
                       </span>
                       {point.scoring_team_id ? (
-                        <span style={{ fontSize: '0.875rem', color: '#6b7280' }}>
+                        <span style={{ fontSize: '0.875rem', color: 'var(--text-tertiary)' }}>
                           Scored by {point.scoring_team_id === game.team_home_id ? homeTeam?.name : awayTeam?.name}
                         </span>
                       ) : (
-                        <span style={{ fontSize: '0.875rem', color: '#9ca3af' }}>In progress</span>
+                        <span style={{ fontSize: '0.875rem', color: 'var(--text-quaternary)' }}>In progress</span>
                       )}
                     </div>
                   </div>
@@ -986,7 +998,7 @@ export default function GamePage({ params }: { params: { id: string } }) {
           padding: '1.5rem',
           border: '2px solid #3B82F6',
           borderRadius: '0.75rem',
-          backgroundColor: '#f0f9ff'
+          backgroundColor: 'var(--bg-tertiary)'
         }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', flexWrap: 'wrap', gap: '0.5rem' }}>
             {(() => {
@@ -1097,7 +1109,7 @@ export default function GamePage({ params }: { params: { id: string } }) {
               return (
                 <p style={{ 
                   fontSize: '0.875rem', 
-                  color: '#6b7280', 
+                  color: 'var(--text-tertiary)', 
                   marginBottom: '0.75rem',
                   fontStyle: 'italic'
                 }}>
@@ -1149,11 +1161,11 @@ export default function GamePage({ params }: { params: { id: string } }) {
                           onClick={() => handlePlayerTap(player.id)}
                           style={{
                             padding: '0.75rem',
-                            border: `2px solid ${showStatButtons === player.id ? homeTeam?.color_primary || '#3B82F6' : '#e5e7eb'}`,
+                            border: `2px solid ${showStatButtons === player.id ? homeTeam?.color_primary || '#3B82F6' : 'var(--border-color)'}`,
                             borderRadius: '0.5rem',
                             backgroundColor: showStatButtons === player.id 
                               ? `${homeTeam?.color_primary || '#3B82F6'}20` 
-                              : 'white',
+                              : 'var(--bg-secondary)',
                             textAlign: 'left',
                             cursor: 'pointer',
                             display: 'flex',
@@ -1262,11 +1274,11 @@ export default function GamePage({ params }: { params: { id: string } }) {
                           onClick={() => handlePlayerTap(player.id)}
                           style={{
                             padding: '0.75rem',
-                            border: `2px solid ${showStatButtons === player.id ? awayTeam?.color_primary || '#3B82F6' : '#e5e7eb'}`,
+                            border: `2px solid ${showStatButtons === player.id ? awayTeam?.color_primary || '#3B82F6' : 'var(--border-color)'}`,
                             borderRadius: '0.5rem',
                             backgroundColor: showStatButtons === player.id 
                               ? `${awayTeam?.color_primary || '#3B82F6'}20` 
-                              : 'white',
+                              : 'var(--bg-secondary)',
                             textAlign: 'left',
                             cursor: 'pointer',
                             display: 'flex',
@@ -1656,7 +1668,7 @@ export default function GamePage({ params }: { params: { id: string } }) {
 
           {/* Event History */}
           {events.length > 0 && (
-            <div style={{ marginTop: '1.5rem', paddingTop: '1.5rem', borderTop: '1px solid #e5e7eb' }}>
+            <div style={{ marginTop: '1.5rem', paddingTop: '1.5rem', borderTop: '1px solid var(--border-color)' }}>
               <h3 style={{ marginBottom: '0.75rem', fontSize: '1rem' }}>Event History</h3>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
                 {events.map(event => {
@@ -1694,8 +1706,8 @@ export default function GamePage({ params }: { params: { id: string } }) {
                       key={event.id}
                       style={{
                         padding: '0.75rem',
-                        backgroundColor: 'white',
-                        border: '1px solid #e5e7eb',
+                        backgroundColor: 'var(--bg-secondary)',
+                        border: '1px solid var(--border-color)',
                         borderRadius: '0.5rem',
                         fontSize: '0.875rem'
                       }}
@@ -1818,7 +1830,7 @@ export default function GamePage({ params }: { params: { id: string } }) {
                   maxHeight: '400px',
                   overflowY: 'auto',
                   padding: '0.5rem',
-                  border: `2px solid ${homeTeam?.color_primary || '#e5e7eb'}`,
+                  border: `2px solid ${homeTeam?.color_primary || 'var(--border-color)'}`,
                   borderRadius: '0.5rem'
                 }}>
                   {homePlayers.length === 0 ? (
@@ -1835,11 +1847,11 @@ export default function GamePage({ params }: { params: { id: string } }) {
                             disabled={!isSelected && selectedHomePlayers.length >= 7}
                             style={{
                               padding: '0.75rem',
-                              border: `2px solid ${isSelected ? homeTeam?.color_primary || '#3B82F6' : '#e5e7eb'}`,
+                              border: `2px solid ${isSelected ? homeTeam?.color_primary || '#3B82F6' : 'var(--border-color)'}`,
                               borderRadius: '0.5rem',
                               backgroundColor: isSelected 
                                 ? `${homeTeam?.color_primary || '#3B82F6'}20` 
-                                : 'white',
+                                : 'var(--bg-secondary)',
                               cursor: (!isSelected && selectedHomePlayers.length >= 7) ? 'not-allowed' : 'pointer',
                               opacity: (!isSelected && selectedHomePlayers.length >= 7) ? 0.5 : 1,
                               textAlign: 'left',
@@ -1968,11 +1980,11 @@ export default function GamePage({ params }: { params: { id: string } }) {
                             disabled={!isSelected && selectedAwayPlayers.length >= 7}
                             style={{
                               padding: '0.75rem',
-                              border: `2px solid ${isSelected ? awayTeam?.color_primary || '#3B82F6' : '#e5e7eb'}`,
+                              border: `2px solid ${isSelected ? awayTeam?.color_primary || '#3B82F6' : 'var(--border-color)'}`,
                               borderRadius: '0.5rem',
                               backgroundColor: isSelected 
                                 ? `${awayTeam?.color_primary || '#3B82F6'}20` 
-                                : 'white',
+                                : 'var(--bg-secondary)',
                               cursor: (!isSelected && selectedAwayPlayers.length >= 7) ? 'not-allowed' : 'pointer',
                               opacity: (!isSelected && selectedAwayPlayers.length >= 7) ? 0.5 : 1,
                               textAlign: 'left',

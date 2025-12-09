@@ -13,14 +13,47 @@ body {
   overflow-x: hidden;
 }
 
+:root {
+  /* Light mode colors */
+  --bg-primary: #f9fafb;
+  --bg-secondary: #ffffff;
+  --bg-tertiary: #f3f4f6;
+  --text-primary: #111827;
+  --text-secondary: #374151;
+  --text-tertiary: #6b7280;
+  --text-quaternary: #9ca3af;
+  --border-color: #e5e7eb;
+  --border-hover: #d1d5db;
+  --shadow: rgba(0, 0, 0, 0.1);
+  --shadow-hover: rgba(0, 0, 0, 0.15);
+  --modal-overlay: rgba(0, 0, 0, 0.5);
+}
+
+.dark {
+  /* Dark mode colors */
+  --bg-primary: #111827;
+  --bg-secondary: #1f2937;
+  --bg-tertiary: #374151;
+  --text-primary: #f9fafb;
+  --text-secondary: #e5e7eb;
+  --text-tertiary: #d1d5db;
+  --text-quaternary: #9ca3af;
+  --border-color: #374151;
+  --border-hover: #4b5563;
+  --shadow: rgba(0, 0, 0, 0.3);
+  --shadow-hover: rgba(0, 0, 0, 0.4);
+  --modal-overlay: rgba(0, 0, 0, 0.7);
+}
+
 body {
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
     'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
     sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  background-color: #f9fafb;
-  color: #111827;
+  background-color: var(--bg-primary);
+  color: var(--text-primary);
+  transition: background-color 0.2s ease, color 0.2s ease;
 }
 
 .container {
@@ -39,20 +72,23 @@ body {
 .header h1 {
   font-size: 2.5rem;
   font-weight: 700;
-  color: #111827;
+  color: var(--text-primary);
   margin-bottom: 0.5rem;
+  transition: color 0.2s ease;
 }
 
 .subtitle {
   font-size: 1rem;
-  color: #6b7280;
+  color: var(--text-tertiary);
   margin-bottom: 0.25rem;
+  transition: color 0.2s ease;
 }
 
 .description {
   font-size: 0.875rem;
-  color: #9ca3af;
+  color: var(--text-quaternary);
   margin-top: 0.25rem;
+  transition: color 0.2s ease;
 }
 
 .back-button {
@@ -80,13 +116,13 @@ body {
 
 .nav-card {
   display: block;
-  background: white;
+  background: var(--bg-secondary);
   border-radius: 1rem;
   padding: 2rem;
   text-decoration: none;
   color: inherit;
-  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1);
-  transition: transform 0.2s, box-shadow 0.2s;
+  box-shadow: 0 1px 3px 0 var(--shadow);
+  transition: transform 0.2s, box-shadow 0.2s, background-color 0.2s;
   border: 2px solid transparent;
 }
 
@@ -104,20 +140,23 @@ body {
 .nav-card-text {
   font-size: 1.125rem;
   font-weight: 600;
-  color: #111827;
+  color: var(--text-primary);
   display: block;
+  transition: color 0.2s ease;
 }
 
 .nav-card h2 {
   font-size: 1.5rem;
   font-weight: 600;
   margin-bottom: 0.5rem;
-  color: #111827;
+  color: var(--text-primary);
+  transition: color 0.2s ease;
 }
 
 .nav-card p {
-  color: #6b7280;
+  color: var(--text-tertiary);
   font-size: 0.875rem;
+  transition: color 0.2s ease;
 }
 
 /* Buttons */
@@ -151,9 +190,9 @@ body {
 }
 
 .secondary-button {
-  background-color: white;
-  color: #374151;
-  border: 2px solid #e5e7eb;
+  background-color: var(--bg-secondary);
+  color: var(--text-secondary);
+  border: 2px solid var(--border-color);
   border-radius: 0.75rem;
   padding: 1rem 2rem;
   font-size: 1rem;
@@ -165,8 +204,8 @@ body {
 }
 
 .secondary-button:hover {
-  border-color: #d1d5db;
-  background-color: #f9fafb;
+  border-color: var(--border-hover);
+  background-color: var(--bg-tertiary);
 }
 
 .primary-button.small,
@@ -186,10 +225,11 @@ body {
 }
 
 .team-card {
-  background: white;
+  background: var(--bg-secondary);
   border-radius: 1rem;
-  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1);
+  box-shadow: 0 1px 3px 0 var(--shadow);
   overflow: hidden;
+  transition: background-color 0.2s ease, box-shadow 0.2s ease;
 }
 
 .team-card-header {
@@ -202,7 +242,7 @@ body {
 }
 
 .team-card-header:hover {
-  background-color: #f9fafb;
+  background-color: var(--bg-tertiary);
 }
 
 .team-info {
@@ -222,13 +262,15 @@ body {
 .team-info h3 {
   font-size: 1.25rem;
   font-weight: 600;
-  color: #111827;
+  color: var(--text-primary);
   margin-bottom: 0.25rem;
+  transition: color 0.2s ease;
 }
 
 .team-meta {
   font-size: 0.875rem;
-  color: #6b7280;
+  color: var(--text-tertiary);
+  transition: color 0.2s ease;
 }
 
 .expand-icon {
@@ -239,15 +281,16 @@ body {
 
 .team-card-content {
   padding: 0 1.25rem 1.25rem;
-  border-top: 1px solid #e5e7eb;
+  border-top: 1px solid var(--border-color);
   margin-top: 0.5rem;
   padding-top: 1.25rem;
+  transition: border-color 0.2s ease;
 }
 
 .add-player-button {
-  background-color: #f3f4f6;
-  color: #374151;
-  border: 2px dashed #d1d5db;
+  background-color: var(--bg-tertiary);
+  color: var(--text-secondary);
+  border: 2px dashed var(--border-hover);
   border-radius: 0.75rem;
   padding: 0.75rem 1rem;
   font-size: 0.875rem;
@@ -266,10 +309,11 @@ body {
 }
 
 .add-player-form {
-  background-color: #f9fafb;
+  background-color: var(--bg-tertiary);
   border-radius: 0.75rem;
   padding: 1rem;
   margin-bottom: 1rem;
+  transition: background-color 0.2s ease;
 }
 
 .form-actions {
@@ -289,8 +333,9 @@ body {
   align-items: center;
   gap: 1rem;
   padding: 0.75rem;
-  background-color: #f9fafb;
+  background-color: var(--bg-tertiary);
   border-radius: 0.5rem;
+  transition: background-color 0.2s ease;
 }
 
 .jersey-number {
@@ -303,7 +348,8 @@ body {
 .player-name {
   flex: 1 1;
   font-size: 1rem;
-  color: #111827;
+  color: var(--text-primary);
+  transition: color 0.2s ease;
 }
 
 .delete-button {
@@ -331,11 +377,13 @@ body {
 .input {
   width: 100%;
   padding: 1rem;
-  border: 2px solid #e5e7eb;
+  border: 2px solid var(--border-color);
   border-radius: 0.75rem;
   font-size: 1rem;
-  transition: border-color 0.2s;
+  transition: border-color 0.2s, background-color 0.2s, color 0.2s;
   min-height: 48px;
+  background-color: var(--bg-secondary);
+  color: var(--text-primary);
 }
 
 .input:focus {
@@ -351,8 +399,9 @@ body {
   display: block;
   font-weight: 600;
   margin-bottom: 0.5rem;
-  color: #374151;
+  color: var(--text-secondary);
   font-size: 0.875rem;
+  transition: color 0.2s ease;
 }
 
 .color-picker-group {
@@ -370,9 +419,10 @@ body {
 .color-picker {
   width: 4rem;
   height: 3rem;
-  border: 2px solid #e5e7eb;
+  border: 2px solid var(--border-color);
   border-radius: 0.5rem;
   cursor: pointer;
+  transition: border-color 0.2s ease;
 }
 
 /* Modal */
@@ -382,29 +432,32 @@ body {
   left: 0;
   right: 0;
   bottom: 0;
-  background-color: rgba(0, 0, 0, 0.5);
+  background-color: var(--modal-overlay);
   display: flex;
   align-items: center;
   justify-content: center;
   z-index: 1000;
   padding: 1rem;
+  transition: background-color 0.2s ease;
 }
 
 .modal {
-  background: white;
+  background: var(--bg-secondary);
   border-radius: 1rem;
   padding: 2rem;
   width: 100%;
   max-width: 500px;
   max-height: 90vh;
   overflow-y: auto;
+  transition: background-color 0.2s ease;
 }
 
 .modal h2 {
   font-size: 1.5rem;
   font-weight: 600;
   margin-bottom: 1.5rem;
-  color: #111827;
+  color: var(--text-primary);
+  transition: color 0.2s ease;
 }
 
 .modal-actions {
@@ -449,9 +502,9 @@ body {
   align-items: center;
   gap: 1rem;
   padding: 1rem;
-  border: 2px solid #e5e7eb;
+  border: 2px solid var(--border-color);
   border-radius: 0.75rem;
-  background: white;
+  background: var(--bg-secondary);
   cursor: pointer;
   transition: all 0.2s;
   text-align: left;
@@ -459,7 +512,7 @@ body {
 }
 
 .team-option:hover {
-  border-color: #d1d5db;
+  border-color: var(--border-hover);
 }
 
 .team-option.selected {
@@ -476,21 +529,24 @@ body {
 
 .team-option span {
   font-size: 1rem;
-  color: #111827;
+  color: var(--text-primary);
+  transition: color 0.2s ease;
 }
 
 /* Empty States */
 .empty-state {
   text-align: center;
-  color: #9ca3af;
+  color: var(--text-quaternary);
   padding: 1rem;
   font-size: 0.875rem;
+  transition: color 0.2s ease;
 }
 
 .empty-state-container {
   text-align: center;
   padding: 3rem 1rem;
-  color: #6b7280;
+  color: var(--text-tertiary);
+  transition: color 0.2s ease;
 }
 
 .empty-state-container p {
@@ -530,10 +586,11 @@ body {
   align-items: center;
   justify-content: center;
   gap: 2rem;
-  background: white;
+  background: var(--bg-secondary);
   border-radius: 1rem;
   padding: 2rem;
-  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1);
+  box-shadow: 0 1px 3px 0 var(--shadow);
+  transition: background-color 0.2s ease, box-shadow 0.2s ease;
 }
 
 .score-team {
@@ -544,21 +601,24 @@ body {
 .score-team h2 {
   font-size: 1.25rem;
   font-weight: 600;
-  color: #6b7280;
+  color: var(--text-tertiary);
   margin-bottom: 0.5rem;
+  transition: color 0.2s ease;
 }
 
 .score-value {
   font-size: 4rem;
   font-weight: 700;
-  color: #111827;
+  color: var(--text-primary);
   line-height: 1;
+  transition: color 0.2s ease;
 }
 
 .score-separator {
   font-size: 2rem;
   font-weight: 600;
-  color: #9ca3af;
+  color: var(--text-quaternary);
+  transition: color 0.2s ease;
 }
 
 .game-info {
@@ -568,28 +628,32 @@ body {
 
 .game-status {
   font-size: 1rem;
-  color: #6b7280;
+  color: var(--text-tertiary);
   margin-bottom: 1rem;
+  transition: color 0.2s ease;
 }
 
 .info-text {
   font-size: 0.875rem;
-  color: #9ca3af;
+  color: var(--text-quaternary);
   font-style: italic;
+  transition: color 0.2s ease;
 }
 
 /* Quick Start Guide */
 .quick-start-guide {
   margin-top: 3rem;
   padding-top: 2rem;
-  border-top: 1px solid #e5e7eb;
+  border-top: 1px solid var(--border-color);
+  transition: border-color 0.2s ease;
 }
 
 .quick-start-guide h2 {
   font-size: 1.25rem;
   font-weight: 600;
-  color: #111827;
+  color: var(--text-primary);
   margin-bottom: 1.5rem;
+  transition: color 0.2s ease;
 }
 
 .guide-list {
@@ -603,10 +667,11 @@ body {
 
 .guide-list li {
   font-size: 0.9375rem;
-  color: #374151;
+  color: var(--text-secondary);
   padding-left: 1.5rem;
   position: relative;
   line-height: 1.6;
+  transition: color 0.2s ease;
 }
 
 .guide-list li::before {
@@ -633,9 +698,10 @@ body {
 .footer {
   margin-top: auto;
   padding: 2rem 1rem;
-  background-color: #f9fafb;
-  border-top: 1px solid #e5e7eb;
+  background-color: var(--bg-primary);
+  border-top: 1px solid var(--border-color);
   text-align: center;
+  transition: background-color 0.2s ease, border-color 0.2s ease;
 }
 
 .footer-content {
@@ -645,14 +711,16 @@ body {
 
 .footer-text {
   font-size: 0.875rem;
-  color: #6b7280;
+  color: var(--text-tertiary);
   margin: 0;
   line-height: 1.6;
+  transition: color 0.2s ease;
 }
 
 .footer-text strong {
-  color: #374151;
+  color: var(--text-secondary);
   font-weight: 600;
+  transition: color 0.2s ease;
 }
 
 .footer-link {
