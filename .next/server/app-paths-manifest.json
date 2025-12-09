@@ -1,6 +1,3 @@
 {
-  "/games/setup/page": "app/games/setup/page.js",
-  "/page": "app/page.js",
-  "/teams/page": "app/teams/page.js",
   "/games/[id]/page": "app/games/[id]/page.js"
 }
