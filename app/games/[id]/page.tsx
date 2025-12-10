@@ -2,9 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react'
 import Link from 'next/link'
-import Image from 'next/image'
 import { supabase } from '@/lib/supabase'
-import Logo from '@/app/components/Logo'
 
 interface Game {
   id: string
@@ -922,11 +920,6 @@ export default function GamePage({ params }: { params: { id: string } }) {
   if (!game) {
     return (
       <div className="container">
-      <Link href="/" style={{ display: 'block', textDecoration: 'none', marginBottom: '1.5rem' }}>
-        <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
-          <Logo />
-        </div>
-      </Link>
         <p>Game not found</p>
         <Link href="/" className="primary-button">
           Go Home
@@ -937,11 +930,6 @@ export default function GamePage({ params }: { params: { id: string } }) {
 
   return (
     <div className="container">
-      <Link href="/" style={{ display: 'block', textDecoration: 'none', marginBottom: '1.5rem' }}>
-        <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
-          <Logo />
-        </div>
-      </Link>
       <div className="header">
         <Link href="/" className="back-button">← Back</Link>
         <h1>{game.name || game.location || 'Game'}</h1>
