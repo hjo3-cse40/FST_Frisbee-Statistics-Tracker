@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from 'react'
 import Link from 'next/link'
 import { supabase } from '@/lib/supabase'
+import { useAuth } from '@/app/components/AuthProvider'
 
 interface Game {
   id: string
@@ -57,6 +58,7 @@ interface PointLineup {
 }
 
 export default function GamePage({ params }: { params: { id: string } }) {
+  const { user } = useAuth()
   const [game, setGame] = useState<Game | null>(null)
   const [homeTeam, setHomeTeam] = useState<Team | null>(null)
   const [awayTeam, setAwayTeam] = useState<Team | null>(null)

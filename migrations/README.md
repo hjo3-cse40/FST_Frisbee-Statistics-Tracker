@@ -66,6 +66,22 @@ Adds support for tracking the winning score for games.
 
 **Important:** Run this migration to enable win detection. When a team reaches `points_to_win`, the game is considered over and a win message is displayed.
 
+### `add_user_authentication.sql` (User Authentication)
+
+Adds support for user accounts and data persistence.
+
+**What it adds:**
+- `user_id` columns to `teams`, `players`, and `games` tables
+- Row Level Security (RLS) policies for data privacy
+- Support for guest mode (user_id = NULL)
+- Indexes for performance
+
+**Important:** Run this migration to enable user authentication. After running:
+- Users can create accounts to save their data
+- Guest mode still works (user_id = NULL)
+- Users can only see their own data when logged in
+- Guest data is visible to all users (can be changed in RLS policies)
+
 ## Verification
 
 After running the migration, you can verify it worked by:

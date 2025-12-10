@@ -75,7 +75,29 @@ FST is a mobile app developed to help keep track of statistics of frisbee player
 - Distinguishes between defensive actions (blocks/interceptions) and turnover outcomes
 - Supports all standard ultimate frisbee stat types
 
-### PHASE 4 — Score, Summaries & Plus/Minus (Week 4)
+### PHASE 4 — User Authentication & Data Persistence (Week 4)
+
+🔧 **Backend**
+- Set up Supabase Authentication
+- Add `user_id` columns to all tables (teams, players, games, points, events)
+- Implement Row Level Security (RLS) policies
+- Create migration for user_id columns
+- Support guest mode (user_id = NULL)
+
+🖥️ **UI**
+- Sign up page (email/password)
+- Sign in page
+- Sign out functionality
+- User session management
+- "Claim existing data" flow for guest → authenticated transition
+
+✔ **Deliverable**
+- Users can create accounts
+- Data is associated with user accounts
+- Users can only see their own data
+- Guest mode still works without login
+
+### PHASE 5 — Score, Summaries & Plus/Minus (Week 5)
 
 🔧 **Backend computation**
 - Add "point scored" button
@@ -92,7 +114,7 @@ FST is a mobile app developed to help keep track of statistics of frisbee player
 ✔ **Deliverable**
 - All core Frisbee stats computed correctly
 
-### PHASE 5 — Importing & Rosters (Week 5)
+### PHASE 6 — Importing & Rosters (Week 6)
 
 🔧 **Backend**
 - CSV import for players
@@ -107,7 +129,24 @@ FST is a mobile app developed to help keep track of statistics of frisbee player
 ✔ **Deliverable**
 - Fast roster setup without manual typing
 
-### PHASE 6 — Polish + Deployment (Week 6)
+### PHASE 7 — Games List & Navigation (Week 7)
+
+🔧 **Backend**
+- No database changes needed
+- Query all games from existing games table (filtered by user_id if authenticated)
+
+🖥️ **UI**
+- Create `/games` page listing all games
+- Show game name, date, teams, scores, status
+- Link to individual game pages
+- Add "View All Games" to homepage navigation
+- Filter/sort games (by date, status, etc.)
+
+✔ **Deliverable**
+- Users can view and return to past games
+- Easy navigation between games
+
+### PHASE 8 — Polish + Deployment (Week 8)
 
 📱 **Mobile Improvements**
 - Responsive layout for phones/iPads

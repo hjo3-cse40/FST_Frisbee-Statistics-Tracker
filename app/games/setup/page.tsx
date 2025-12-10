@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { supabase } from '@/lib/supabase'
+import { useAuth } from '@/app/components/AuthProvider'
 
 interface Team {
   id: string
@@ -12,6 +13,7 @@ interface Team {
 }
 
 export default function GameSetupPage() {
+  const { user } = useAuth()
   const [teams, setTeams] = useState<Team[]>([])
   const [homeTeamId, setHomeTeamId] = useState<string>('')
   const [awayTeamId, setAwayTeamId] = useState<string>('')
@@ -29,14 +31,22 @@ export default function GameSetupPage() {
 
   useEffect(() => {
     loadTeams()
-  }, [])
+  }, [user])
 
   const loadTeams = async () => {
     try {
-      const { data, error } = await supabase
+      let query = supabase
         .from('teams')
         .select('*')
-        .order('name', { ascending: true })
+      
+      // Filter by user_id if logged in, or show guest teams if not
+      if (user) {
+        query = query.eq('user_id', user.id)
+      } else {
+        query = query.is('user_id', null)
+      }
+      
+      const { data, error } = await query.order('name', { ascending: true })
       
       if (error) throw error
       setTeams(data || [])
@@ -74,7 +84,8 @@ export default function GameSetupPage() {
         home_score: 0,
         away_score: 0,
         points_to_win: pointsToWin,
-        location: gameLocation.trim() || null
+        location: gameLocation.trim() || null,
+        user_id: user?.id || null
       }
 
       // Only include name if it's provided (in case the column doesn't exist yet)

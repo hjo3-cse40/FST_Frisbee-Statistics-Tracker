@@ -2,7 +2,9 @@ import type { Metadata } from 'next'
 import './globals.css'
 import Footer from './components/Footer'
 import { ThemeProvider } from './components/ThemeProvider'
+import { AuthProvider } from './components/AuthProvider'
 import ThemeToggle from './components/ThemeToggle'
+import UserMenu from './components/UserMenu'
 
 export const metadata: Metadata = {
   title: 'FST Frisbee Statistics Tracker',
@@ -18,11 +20,14 @@ export default function RootLayout({
     <html lang="en" suppressHydrationWarning>
       <body>
         <ThemeProvider>
-          <ThemeToggle />
-          <div className="layout-wrapper">
-            <main>{children}</main>
-            <Footer />
-          </div>
+          <AuthProvider>
+            <ThemeToggle />
+            <UserMenu />
+            <div className="layout-wrapper">
+              <main>{children}</main>
+              <Footer />
+            </div>
+          </AuthProvider>
         </ThemeProvider>
       </body>
     </html>

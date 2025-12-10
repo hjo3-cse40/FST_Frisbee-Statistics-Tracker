@@ -13,13 +13,15 @@ export default function HomePage() {
       
       <div className="nav-cards">
         <Link href="/games/setup" className="nav-card">
-          <div className="nav-card-icon">🥏</div>
           <span className="nav-card-text">Start New Game</span>
         </Link>
         
         <Link href="/teams" className="nav-card">
-          <div className="nav-card-icon">👥</div>
           <span className="nav-card-text">Manage Teams & Players</span>
+        </Link>
+        
+        <Link href="/games" className="nav-card">
+          <span className="nav-card-text">View All Games</span>
         </Link>
       </div>
       

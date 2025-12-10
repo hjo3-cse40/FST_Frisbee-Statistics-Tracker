@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { supabase } from '@/lib/supabase'
+import { useAuth } from '@/app/components/AuthProvider'
 
 interface Player {
   id: string
@@ -22,6 +23,7 @@ interface Team {
 type SortOption = 'name-asc' | 'name-desc' | 'number-asc' | 'number-desc'
 
 export default function TeamsPage() {
+  const { user } = useAuth()
   const [teams, setTeams] = useState<Team[]>([])
   const [players, setPlayers] = useState<Player[]>([])
   const [expandedTeam, setExpandedTeam] = useState<string | null>(null)
@@ -40,14 +42,22 @@ export default function TeamsPage() {
   useEffect(() => {
     loadTeams()
     loadPlayers()
-  }, [])
+  }, [user])
 
   const loadTeams = async () => {
     try {
-      const { data, error } = await supabase
+      let query = supabase
         .from('teams')
         .select('*')
-        .order('created_at', { ascending: false })
+      
+      // Filter by user_id if logged in, or show guest teams (user_id IS NULL) if not
+      if (user) {
+        query = query.eq('user_id', user.id)
+      } else {
+        query = query.is('user_id', null)
+      }
+      
+      const { data, error } = await query.order('created_at', { ascending: false })
       
       if (error) throw error
       setTeams(data || [])
@@ -58,10 +68,25 @@ export default function TeamsPage() {
 
   const loadPlayers = async () => {
     try {
-      const { data, error } = await supabase
+      // Load players for teams that belong to the user (or guest)
+      const teamIds = teams.map(t => t.id)
+      if (teamIds.length === 0) {
+        setPlayers([])
+        return
+      }
+
+      let query = supabase
         .from('players')
         .select('*')
-        .order('number', { ascending: true })
+        .in('team_id', teamIds)
+      
+      if (user) {
+        query = query.eq('user_id', user.id)
+      } else {
+        query = query.is('user_id', null)
+      }
+      
+      const { data, error } = await query.order('number', { ascending: true })
       
       if (error) throw error
       setPlayers(data || [])
@@ -74,9 +99,15 @@ export default function TeamsPage() {
     if (!newTeamName.trim()) return
 
     try {
+      const teamData: any = {
+        name: newTeamName,
+        color_primary: newTeamColor,
+        user_id: user?.id || null
+      }
+
       const { data, error } = await supabase
         .from('teams')
-        .insert([{ name: newTeamName, color_primary: newTeamColor }])
+        .insert([teamData])
         .select()
         .single()
 
@@ -97,6 +128,13 @@ export default function TeamsPage() {
 
     const playerNumber = parseInt(newPlayerJersey)
     const playerName = newPlayerName.trim()
+    
+    const playerData: any = {
+      name: playerName,
+      number: playerNumber,
+      team_id: teamId,
+      user_id: user?.id || null
+    }
 
     // Check for duplicates: same name and number, or just same name
     const teamPlayers = players.filter(p => p.team_id === teamId)
@@ -122,11 +160,7 @@ export default function TeamsPage() {
     try {
       const { data, error } = await supabase
         .from('players')
-        .insert([{
-          name: playerName,
-          number: playerNumber,
-          team_id: teamId
-        }])
+        .insert([playerData])
         .select()
         .single()
 
