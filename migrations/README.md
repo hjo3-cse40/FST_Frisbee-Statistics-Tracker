@@ -66,6 +66,15 @@ Adds support for tracking the winning score for games.
 
 **Important:** Run this migration to enable win detection. When a team reaches `points_to_win`, the game is considered over and a win message is displayed.
 
+### `add_tournament_name.sql` (Tournament Name)
+
+Adds support for tracking tournament names for games.
+
+**What it adds:**
+- `tournament_name` text column (optional) to `games` table
+
+**Important:** Run this migration to enable tournament name tracking. This allows users to optionally specify which tournament a game belongs to.
+
 ### `add_user_authentication.sql` (User Authentication)
 
 Adds support for user accounts and data persistence.

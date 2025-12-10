@@ -41,8 +41,16 @@ export default function TeamsPage() {
 
   useEffect(() => {
     loadTeams()
-    loadPlayers()
   }, [user])
+
+  useEffect(() => {
+    // Load players whenever teams change
+    if (teams.length > 0) {
+      loadPlayers()
+    } else {
+      setPlayers([])
+    }
+  }, [teams, user])
 
   const loadTeams = async () => {
     try {
@@ -60,7 +68,17 @@ export default function TeamsPage() {
       const { data, error } = await query.order('created_at', { ascending: false })
       
       if (error) throw error
-      setTeams(data || [])
+      
+      // Deduplicate teams by name - take only the first instance of each unique team name
+      const uniqueTeamsMap = new Map<string, any>()
+      for (const team of (data || [])) {
+        const teamNameLower = team.name.toLowerCase()
+        if (!uniqueTeamsMap.has(teamNameLower)) {
+          uniqueTeamsMap.set(teamNameLower, team)
+        }
+      }
+      
+      setTeams(Array.from(uniqueTeamsMap.values()))
     } catch (error) {
       console.error('Error loading teams:', error)
     }
@@ -89,7 +107,18 @@ export default function TeamsPage() {
       const { data, error } = await query.order('number', { ascending: true })
       
       if (error) throw error
-      setPlayers(data || [])
+      
+      // Deduplicate players by team_id, name, and number
+      // Take only the first instance of each unique player
+      const playerMap = new Map<string, any>()
+      for (const player of (data || [])) {
+        const key = `${player.team_id}-${player.name.toLowerCase()}-${player.number}`
+        if (!playerMap.has(key)) {
+          playerMap.set(key, player)
+        }
+      }
+      
+      setPlayers(Array.from(playerMap.values()))
     } catch (error) {
       console.error('Error loading players:', error)
     }

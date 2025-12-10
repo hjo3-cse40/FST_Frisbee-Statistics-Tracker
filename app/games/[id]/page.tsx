@@ -1316,8 +1316,8 @@ export default function GamePage({ params }: { params: { id: string } }) {
                             gap: '0.5rem'
                           }}
                         >
-                          <span style={{ fontWeight: 600, minWidth: '30px' }}>#{player.number}</span>
-                          <span style={{ flex: 1 }}>{player.name}</span>
+                          <span style={{ fontWeight: 600, minWidth: '30px', color: 'var(--text-primary)' }}>#{player.number}</span>
+                          <span style={{ flex: 1, color: 'var(--text-primary)' }}>{player.name}</span>
                           <div style={{ display: 'flex', gap: '0.25rem', alignItems: 'center' }}>
                             {stats.goals > 0 && (
                               <span style={{
@@ -1429,8 +1429,8 @@ export default function GamePage({ params }: { params: { id: string } }) {
                             gap: '0.5rem'
                           }}
                         >
-                          <span style={{ fontWeight: 600, minWidth: '30px' }}>#{player.number}</span>
-                          <span style={{ flex: 1 }}>{player.name}</span>
+                          <span style={{ fontWeight: 600, minWidth: '30px', color: 'var(--text-primary)' }}>#{player.number}</span>
+                          <span style={{ flex: 1, color: 'var(--text-primary)' }}>{player.name}</span>
                           <div style={{ display: 'flex', gap: '0.25rem', alignItems: 'center' }}>
                             {stats.goals > 0 && (
                               <span style={{
@@ -1912,6 +1912,15 @@ export default function GamePage({ params }: { params: { id: string } }) {
               >
                 Random 7 (Testing)
               </button>
+              <button
+                onClick={() => {}}
+                className="secondary-button"
+                style={{ fontSize: '0.875rem', padding: '0.5rem 1rem', opacity: 0.6, cursor: 'not-allowed' }}
+                disabled
+                title="Future implementation"
+              >
+                Pre-selected Lines (Future Implementation)
+              </button>
             </div>
 
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem', marginBottom: '1.5rem' }}>
@@ -1972,7 +1981,7 @@ export default function GamePage({ params }: { params: { id: string } }) {
                 )}
                 <h3 style={{ 
                   marginBottom: '1rem', 
-                  color: homeTeam?.color_primary || '#000',
+                  color: homeTeam?.color_primary || 'var(--text-primary)',
                   display: 'flex',
                   alignItems: 'center',
                   gap: '0.5rem'
@@ -2031,11 +2040,11 @@ export default function GamePage({ params }: { params: { id: string } }) {
                             <span style={{ 
                               fontWeight: 600, 
                               minWidth: '30px',
-                              color: isSelected ? homeTeam?.color_primary || '#3B82F6' : '#374151'
+                              color: isSelected ? homeTeam?.color_primary || '#3B82F6' : 'var(--text-primary)'
                             }}>
                               #{player.number}
                             </span>
-                            <span style={{ flex: 1 }}>{player.name}</span>
+                            <span style={{ flex: 1, color: 'var(--text-primary)' }}>{player.name}</span>
                             {isSelected && (
                               <span style={{ color: homeTeam?.color_primary || '#3B82F6', fontSize: '1.25rem' }}>
                                 ✓
@@ -2105,7 +2114,7 @@ export default function GamePage({ params }: { params: { id: string } }) {
                 )}
                 <h3 style={{ 
                   marginBottom: '1rem',
-                  color: awayTeam?.color_primary || '#000',
+                  color: awayTeam?.color_primary || 'var(--text-primary)',
                   display: 'flex',
                   alignItems: 'center',
                   gap: '0.5rem'
@@ -2164,11 +2173,11 @@ export default function GamePage({ params }: { params: { id: string } }) {
                             <span style={{ 
                               fontWeight: 600, 
                               minWidth: '30px',
-                              color: isSelected ? awayTeam?.color_primary || '#3B82F6' : '#374151'
+                              color: isSelected ? awayTeam?.color_primary || '#3B82F6' : 'var(--text-primary)'
                             }}>
                               #{player.number}
                             </span>
-                            <span style={{ flex: 1 }}>{player.name}</span>
+                            <span style={{ flex: 1, color: 'var(--text-primary)' }}>{player.name}</span>
                             {isSelected && (
                               <span style={{ color: awayTeam?.color_primary || '#3B82F6', fontSize: '1.25rem' }}>
                                 ✓

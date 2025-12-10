@@ -20,6 +20,7 @@ export default function GameSetupPage() {
   const [pullingTeamId, setPullingTeamId] = useState<string>('')
   const [gameLocation, setGameLocation] = useState('')
   const [gameName, setGameName] = useState('')
+  const [tournamentName, setTournamentName] = useState('')
   const [pointsToWin, setPointsToWin] = useState<number>(15)
 
   // Set default pulling team when both teams are selected
@@ -93,6 +94,17 @@ export default function GameSetupPage() {
         gameData.name = gameName.trim()
       }
 
+      // Only include tournament_name if it's provided
+      // Note: Make sure to run the add_tournament_name.sql migration first
+      if (tournamentName.trim()) {
+        try {
+          gameData.tournament_name = tournamentName.trim()
+        } catch (e) {
+          // Column might not exist yet - silently skip
+          console.warn('tournament_name column may not exist in database')
+        }
+      }
+
       const { data, error } = await supabase
         .from('games')
         .insert([gameData])
@@ -139,6 +151,17 @@ export default function GameSetupPage() {
             placeholder="e.g., Practice Field"
             value={gameLocation}
             onChange={(e) => setGameLocation(e.target.value)}
+            className="input"
+          />
+        </div>
+
+        <div className="form-group">
+          <label>Tournament Name (optional)</label>
+          <input
+            type="text"
+            placeholder="e.g., President's Day Invite"
+            value={tournamentName}
+            onChange={(e) => setTournamentName(e.target.value)}
             className="input"
           />
         </div>

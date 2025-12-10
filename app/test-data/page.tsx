@@ -25,23 +25,36 @@ export default function TestDataPage() {
 
       // Fetch teams with matching names (case-insensitive)
       // Looking for: "Cal Ursa Major 2024-2025" and "Slugs 2024-2025"
-      const { data: teamsData, error: teamsError } = await supabase
+      // Get the original test teams (those without a user_id or with a specific user_id)
+      // We'll use the first instance of each team name
+      const { data: allTeamsData, error: teamsError } = await supabase
         .from('teams')
         .select('*')
         .or('name.ilike.%Cal Ursa Major 2024-2025%,name.ilike.%Slugs 2024-2025%')
-        .order('name', { ascending: true })
+        .order('created_at', { ascending: true })
 
       if (teamsError) throw teamsError
 
-      if (!teamsData || teamsData.length === 0) {
+      if (!allTeamsData || allTeamsData.length === 0) {
         throw new Error('No test teams found. Make sure teams named "Cal Ursa Major 2024-2025" and "Slugs 2024-2025" exist in Supabase.')
       }
+
+      // Deduplicate by team name - take the first instance of each team name
+      const uniqueTeamsMap = new Map<string, any>()
+      for (const team of allTeamsData) {
+        const teamNameLower = team.name.toLowerCase()
+        if (!uniqueTeamsMap.has(teamNameLower)) {
+          uniqueTeamsMap.set(teamNameLower, team)
+        }
+      }
+      
+      const teamsData = Array.from(uniqueTeamsMap.values())
 
       setStatus(`Found ${teamsData.length} test teams`)
 
       // Fetch players for these teams
       const teamIds = teamsData.map(t => t.id)
-      const { data: playersData, error: playersError } = await supabase
+      const { data: allPlayersData, error: playersError } = await supabase
         .from('players')
         .select('*')
         .in('team_id', teamIds)
@@ -50,7 +63,19 @@ export default function TestDataPage() {
 
       if (playersError) throw playersError
 
-      setStatus(`Found ${playersData?.length || 0} players`)
+      // Deduplicate players by team_id, name, and number
+      // Take only the first instance of each unique player
+      const playerMap = new Map<string, any>()
+      for (const player of (allPlayersData || [])) {
+        const key = `${player.team_id}-${player.name.toLowerCase()}-${player.number}`
+        if (!playerMap.has(key)) {
+          playerMap.set(key, player)
+        }
+      }
+      
+      const playersData = Array.from(playerMap.values())
+
+      setStatus(`Found ${playersData.length} unique players`)
 
       // Fetch games for these teams (home or away)
       const { data: gamesDataHome, error: gamesErrorHome } = await supabase
