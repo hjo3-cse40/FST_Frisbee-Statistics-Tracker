@@ -23,6 +23,10 @@ export default function HomePage() {
         <Link href="/games" className="nav-card">
           <span className="nav-card-text">View All Games</span>
         </Link>
+        
+        <Link href="/test-data" className="nav-card" style={{ border: '2px dashed var(--border-color)' }}>
+          <span className="nav-card-text" style={{ color: 'var(--text-tertiary)' }}>Load Test Data</span>
+        </Link>
       </div>
       
       <div className="quick-start-guide">

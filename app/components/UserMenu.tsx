@@ -10,22 +10,39 @@ export default function UserMenu() {
 
   if (!user) {
     return (
-      <Link 
-        href="/auth/signup"
-        className="secondary-button"
-        style={{ 
-          position: 'fixed',
-          top: '1rem',
-          right: '5rem',
-          zIndex: 1000,
-          padding: '0.75rem 1rem',
-          fontSize: '0.875rem',
-          width: 'auto',
-          minHeight: 'auto'
-        }}
-      >
-        Create Account
-      </Link>
+      <div style={{ 
+        position: 'fixed',
+        top: '1rem',
+        right: '5rem',
+        zIndex: 1000,
+        display: 'flex',
+        gap: '0.75rem'
+      }}>
+        <Link 
+          href="/auth/signin"
+          className="secondary-button"
+          style={{ 
+            padding: '0.75rem 1rem',
+            fontSize: '0.875rem',
+            width: 'auto',
+            minHeight: 'auto'
+          }}
+        >
+          Login
+        </Link>
+        <Link 
+          href="/auth/signup"
+          className="primary-button"
+          style={{ 
+            padding: '0.75rem 1rem',
+            fontSize: '0.875rem',
+            width: 'auto',
+            minHeight: 'auto'
+          }}
+        >
+          Create Account
+        </Link>
+      </div>
     )
   }
 

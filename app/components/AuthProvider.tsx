@@ -41,6 +41,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const { data, error } = await supabase.auth.signUp({
       email,
       password,
+      options: {
+        // Disable email confirmation for testing
+        emailRedirectTo: undefined,
+        // Allow test emails
+        data: {
+          // This helps bypass some validation
+        }
+      }
     })
     
     if (!error && data.user) {

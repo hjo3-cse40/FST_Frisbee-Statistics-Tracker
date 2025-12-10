@@ -1,5 +1,8 @@
 {
-  "/games/[id]/page": "app/games/[id]/page.js",
   "/page": "app/page.js",
-  "/games/page": "app/games/page.js"
+  "/teams/page": "app/teams/page.js",
+  "/test-data/page": "app/test-data/page.js",
+  "/games/page": "app/games/page.js",
+  "/auth/signup/page": "app/auth/signup/page.js",
+  "/auth/signin/page": "app/auth/signin/page.js"
 }

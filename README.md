@@ -75,7 +75,7 @@ FST is a mobile app developed to help keep track of statistics of frisbee player
 - Distinguishes between defensive actions (blocks/interceptions) and turnover outcomes
 - Supports all standard ultimate frisbee stat types
 
-### PHASE 4 — User Authentication & Data Persistence (Week 4)
+### (DONE) PHASE 4 — User Authentication & Data Persistence (Week 4)
 
 🔧 **Backend**
 - Set up Supabase Authentication
