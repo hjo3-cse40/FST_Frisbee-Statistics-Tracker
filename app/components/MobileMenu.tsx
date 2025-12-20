@@ -197,7 +197,7 @@ export default function MobileMenu() {
                 <span style={{ fontSize: '1.25rem' }}>
                   {theme === 'light' ? '🌙' : '☀️'}
                 </span>
-                <span>Switch to {theme === 'light' ? 'Dark' : 'Light'} Mode</span>
+                <span>{theme === 'light' ? 'Dark' : 'Light'}</span>
               </button>
             </div>
           </div>
@@ -206,3 +206,5 @@ export default function MobileMenu() {
     </div>
   )
 }
+
+

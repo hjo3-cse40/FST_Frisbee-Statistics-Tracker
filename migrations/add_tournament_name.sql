@@ -6,3 +6,4 @@ ALTER TABLE games
 ADD COLUMN IF NOT EXISTS tournament_name TEXT;
 
 COMMENT ON COLUMN games.tournament_name IS 'Name of the tournament this game belongs to (optional)';
+

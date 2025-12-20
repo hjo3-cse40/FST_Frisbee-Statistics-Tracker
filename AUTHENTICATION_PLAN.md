@@ -199,3 +199,5 @@ CREATE POLICY "Users can delete their own teams" ON teams
 2. **Data Migration**: How should we handle users who create data before signing up?
 3. **Team Sharing**: Should teams be shareable between users? (Future feature)
 4. **Public Games**: Should there be an option to make games public/private?
+
+

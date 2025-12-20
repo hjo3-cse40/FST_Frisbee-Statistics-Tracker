@@ -11,21 +11,6 @@
       "static/css/app/layout.css",
       "static/chunks/app/layout.js"
     ],
-    "/test-data/page": [
-      "static/chunks/webpack.js",
-      "static/chunks/main-app.js",
-      "static/chunks/app/test-data/page.js"
-    ],
-    "/teams/page": [
-      "static/chunks/webpack.js",
-      "static/chunks/main-app.js",
-      "static/chunks/app/teams/page.js"
-    ],
-    "/games/setup/page": [
-      "static/chunks/webpack.js",
-      "static/chunks/main-app.js",
-      "static/chunks/app/games/setup/page.js"
-    ],
     "/games/[id]/page": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
