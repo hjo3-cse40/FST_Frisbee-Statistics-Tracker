@@ -9,6 +9,8 @@ interface Game {
   id: string
   team_home_id: string
   team_away_id: string
+  team_home_jersey_color?: string | null
+  team_away_jersey_color?: string | null
   home_score: number
   away_score: number
   points_to_win: number
@@ -28,6 +30,7 @@ export default function GamesListPage() {
   const [games, setGames] = useState<Game[]>([])
   const [teams, setTeams] = useState<Map<string, Team>>(new Map())
   const [loading, setLoading] = useState(true)
+  const [deletingId, setDeletingId] = useState<string | null>(null)
 
   useEffect(() => {
     loadGames()
@@ -84,6 +87,28 @@ export default function GamesListPage() {
     }
   }
 
+  const deleteGame = async (gameId: string, displayName: string) => {
+    const label = displayName || 'this game'
+    if (!confirm(`Delete "${label}"? This cannot be undone.`)) return
+
+    setDeletingId(gameId)
+    try {
+      const { error } = await supabase
+        .from('games')
+        .delete()
+        .eq('id', gameId)
+
+      if (error) throw error
+
+      setGames((prev) => prev.filter((g) => g.id !== gameId))
+    } catch (error) {
+      console.error('Error deleting game:', error)
+      alert('Failed to delete game. It may still have points or events linked to it.')
+    } finally {
+      setDeletingId(null)
+    }
+  }
+
   if (loading) {
     return (
       <div className="container">
@@ -119,15 +144,40 @@ export default function GamesListPage() {
               ? awayTeam 
               : null
 
+            const homeColor =
+              game.team_home_jersey_color ?? homeTeam?.color_primary ?? '#3B82F6'
+            const awayColor =
+              game.team_away_jersey_color ?? awayTeam?.color_primary ?? '#EF4444'
+
+            const displayName = game.name || game.location || 'Untitled Game'
+
             return (
+              <div key={game.id} style={{ position: 'relative' }}>
+                <button
+                  type="button"
+                  className="delete-button"
+                  aria-label={`Delete ${displayName}`}
+                  disabled={deletingId === game.id}
+                  onClick={() => deleteGame(game.id, displayName)}
+                  style={{
+                    position: 'absolute',
+                    top: '0.75rem',
+                    right: '0.75rem',
+                    zIndex: 1,
+                    opacity: deletingId === game.id ? 0.5 : 1,
+                  }}
+                >
+                  ×
+                </button>
+
               <Link
-                key={game.id}
                 href={`/games/${game.id}`}
-                style={{ textDecoration: 'none', color: 'inherit' }}
+                style={{ textDecoration: 'none', color: 'inherit', display: 'block' }}
               >
                 <div
                   style={{
                     padding: '1.5rem',
+                    paddingRight: '3rem',
                     border: '2px solid var(--border-color)',
                     borderRadius: '0.75rem',
                     backgroundColor: 'var(--bg-secondary)',
@@ -148,7 +198,7 @@ export default function GamesListPage() {
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.75rem' }}>
                     <div>
                       <h3 style={{ margin: 0, marginBottom: '0.25rem', color: 'var(--text-primary)' }}>
-                        {game.name || game.location || 'Untitled Game'}
+                        {displayName}
                       </h3>
                       <p style={{ margin: 0, fontSize: '0.875rem', color: 'var(--text-tertiary)' }}>
                         {new Date(game.date).toLocaleDateString()}
@@ -183,8 +233,17 @@ export default function GamesListPage() {
                   
                   <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
                     <div style={{ flex: 1, textAlign: 'center' }}>
-                      <div style={{ fontSize: '0.875rem', color: 'var(--text-tertiary)', marginBottom: '0.25rem' }}>
-                        {homeTeam?.name || 'Home Team'}
+                      <div style={{
+                        fontSize: '0.875rem',
+                        color: 'var(--text-tertiary)',
+                        marginBottom: '0.25rem',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: '0.375rem',
+                      }}>
+                        <span className="team-color-swatch" style={{ backgroundColor: homeColor }} />
+                        {homeTeam?.name || 'Team 1'}
                       </div>
                       <div style={{ 
                         fontSize: '2rem', 
@@ -198,8 +257,17 @@ export default function GamesListPage() {
                       -
                     </div>
                     <div style={{ flex: 1, textAlign: 'center' }}>
-                      <div style={{ fontSize: '0.875rem', color: 'var(--text-tertiary)', marginBottom: '0.25rem' }}>
-                        {awayTeam?.name || 'Away Team'}
+                      <div style={{
+                        fontSize: '0.875rem',
+                        color: 'var(--text-tertiary)',
+                        marginBottom: '0.25rem',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: '0.375rem',
+                      }}>
+                        <span className="team-color-swatch" style={{ backgroundColor: awayColor }} />
+                        {awayTeam?.name || 'Team 2'}
                       </div>
                       <div style={{ 
                         fontSize: '2rem', 
@@ -221,6 +289,7 @@ export default function GamesListPage() {
                   </div>
                 </div>
               </Link>
+              </div>
             )
           })}
         </div>

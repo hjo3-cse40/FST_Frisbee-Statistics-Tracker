@@ -10,6 +10,8 @@ interface Game {
   team_home_id: string
   team_away_id: string
   pulling_team_id?: string | null
+  team_home_jersey_color?: string | null
+  team_away_jersey_color?: string | null
   home_score: number
   away_score: number
   points_to_win: number
@@ -930,6 +932,11 @@ export default function GamePage({ params }: { params: { id: string } }) {
     )
   }
 
+  const homeJerseyColor =
+    game.team_home_jersey_color ?? homeTeam?.color_primary ?? '#3B82F6'
+  const awayJerseyColor =
+    game.team_away_jersey_color ?? awayTeam?.color_primary ?? '#EF4444'
+
   return (
     <div className="container">
       <div className="header">
@@ -1225,8 +1232,8 @@ export default function GamePage({ params }: { params: { id: string } }) {
                           fontSize: '0.875rem', 
                           padding: '0.5rem 1rem',
                           backgroundColor: scoringTeamId === game.team_home_id 
-                            ? (homeTeam?.color_primary || '#3B82F6')
-                            : (awayTeam?.color_primary || '#3B82F6')
+                            ? (homeJerseyColor)
+                            : (awayJerseyColor)
                         }}
                       >
                         {scoringTeamId === game.team_home_id ? (homeTeam?.name || 'Home') : (awayTeam?.name || 'Away')} Scored
@@ -1288,7 +1295,7 @@ export default function GamePage({ params }: { params: { id: string } }) {
                 <h4 style={{ 
                   fontSize: '0.875rem', 
                   fontWeight: 600, 
-                  color: homeTeam?.color_primary || '#000',
+                  color: homeJerseyColor,
                   marginBottom: '0.5rem'
                 }}>
                   {homeTeam?.name || 'Home Team'}
@@ -1304,10 +1311,10 @@ export default function GamePage({ params }: { params: { id: string } }) {
                           onClick={() => handlePlayerTap(player.id)}
                           style={{
                             padding: '0.75rem',
-                            border: `2px solid ${showStatButtons === player.id ? homeTeam?.color_primary || '#3B82F6' : 'var(--border-color)'}`,
+                            border: `2px solid ${showStatButtons === player.id ? homeJerseyColor : 'var(--border-color)'}`,
                             borderRadius: '0.5rem',
                             backgroundColor: showStatButtons === player.id 
-                              ? `${homeTeam?.color_primary || '#3B82F6'}20` 
+                              ? `${homeJerseyColor}20` 
                               : 'var(--bg-secondary)',
                             textAlign: 'left',
                             cursor: 'pointer',
@@ -1401,7 +1408,7 @@ export default function GamePage({ params }: { params: { id: string } }) {
                 <h4 style={{ 
                   fontSize: '0.875rem', 
                   fontWeight: 600, 
-                  color: awayTeam?.color_primary || '#000',
+                  color: awayJerseyColor,
                   marginBottom: '0.5rem'
                 }}>
                   {awayTeam?.name || 'Away Team'}
@@ -1417,10 +1424,10 @@ export default function GamePage({ params }: { params: { id: string } }) {
                           onClick={() => handlePlayerTap(player.id)}
                           style={{
                             padding: '0.75rem',
-                            border: `2px solid ${showStatButtons === player.id ? awayTeam?.color_primary || '#3B82F6' : 'var(--border-color)'}`,
+                            border: `2px solid ${showStatButtons === player.id ? awayJerseyColor : 'var(--border-color)'}`,
                             borderRadius: '0.5rem',
                             backgroundColor: showStatButtons === player.id 
-                              ? `${awayTeam?.color_primary || '#3B82F6'}20` 
+                              ? `${awayJerseyColor}20` 
                               : 'var(--bg-secondary)',
                             textAlign: 'left',
                             cursor: 'pointer',
@@ -1931,14 +1938,14 @@ export default function GamePage({ params }: { params: { id: string } }) {
                   <div style={{
                     marginBottom: '1rem',
                     padding: '1rem',
-                    backgroundColor: `${homeTeam?.color_primary || '#3B82F6'}10`,
-                    border: `2px solid ${homeTeam?.color_primary || '#3B82F6'}`,
+                    backgroundColor: `${homeJerseyColor}10`,
+                    border: `2px solid ${homeJerseyColor}`,
                     borderRadius: '0.5rem'
                   }}>
                     <div style={{ 
                       fontSize: '0.875rem', 
                       fontWeight: 600, 
-                      color: homeTeam?.color_primary || '#3B82F6',
+                      color: homeJerseyColor,
                       marginBottom: '0.75rem'
                     }}>
                       Selected Lineup ({selectedHomePlayers.length}/7)
@@ -1957,7 +1964,7 @@ export default function GamePage({ params }: { params: { id: string } }) {
                             onClick={() => togglePlayerSelection(playerId, game.team_home_id)}
                             style={{
                               padding: '0.5rem 0.75rem',
-                              backgroundColor: homeTeam?.color_primary || '#3B82F6',
+                              backgroundColor: homeJerseyColor,
                               color: 'white',
                               borderRadius: '0.375rem',
                               fontSize: '0.875rem',
@@ -1981,7 +1988,7 @@ export default function GamePage({ params }: { params: { id: string } }) {
                 )}
                 <h3 style={{ 
                   marginBottom: '1rem', 
-                  color: homeTeam?.color_primary || 'var(--text-primary)',
+                  color: homeJerseyColor,
                   display: 'flex',
                   alignItems: 'center',
                   gap: '0.5rem'
@@ -1991,7 +1998,7 @@ export default function GamePage({ params }: { params: { id: string } }) {
                       width: '20px',
                       height: '20px',
                       borderRadius: '50%',
-                      backgroundColor: homeTeam?.color_primary || '#000'
+                      backgroundColor: homeJerseyColor
                     }}
                   />
                   {homeTeam?.name || 'Home Team'}
@@ -2006,7 +2013,7 @@ export default function GamePage({ params }: { params: { id: string } }) {
                   maxHeight: '400px',
                   overflowY: 'auto',
                   padding: '0.5rem',
-                  border: `2px solid ${homeTeam?.color_primary || 'var(--border-color)'}`,
+                  border: `2px solid ${homeJerseyColor}`,
                   borderRadius: '0.5rem'
                 }}>
                   {homePlayers.length === 0 ? (
@@ -2023,10 +2030,10 @@ export default function GamePage({ params }: { params: { id: string } }) {
                             disabled={!isSelected && selectedHomePlayers.length >= 7}
                             style={{
                               padding: '0.75rem',
-                              border: `2px solid ${isSelected ? homeTeam?.color_primary || '#3B82F6' : 'var(--border-color)'}`,
+                              border: `2px solid ${isSelected ? homeJerseyColor : 'var(--border-color)'}`,
                               borderRadius: '0.5rem',
                               backgroundColor: isSelected 
-                                ? `${homeTeam?.color_primary || '#3B82F6'}20` 
+                                ? `${homeJerseyColor}20` 
                                 : 'var(--bg-secondary)',
                               cursor: (!isSelected && selectedHomePlayers.length >= 7) ? 'not-allowed' : 'pointer',
                               opacity: (!isSelected && selectedHomePlayers.length >= 7) ? 0.5 : 1,
@@ -2040,13 +2047,13 @@ export default function GamePage({ params }: { params: { id: string } }) {
                             <span style={{ 
                               fontWeight: 600, 
                               minWidth: '30px',
-                              color: isSelected ? homeTeam?.color_primary || '#3B82F6' : 'var(--text-primary)'
+                              color: isSelected ? homeJerseyColor : 'var(--text-primary)'
                             }}>
                               #{player.number}
                             </span>
                             <span style={{ flex: 1, color: 'var(--text-primary)' }}>{player.name}</span>
                             {isSelected && (
-                              <span style={{ color: homeTeam?.color_primary || '#3B82F6', fontSize: '1.25rem' }}>
+                              <span style={{ color: homeJerseyColor, fontSize: '1.25rem' }}>
                                 ✓
                               </span>
                             )}
@@ -2064,14 +2071,14 @@ export default function GamePage({ params }: { params: { id: string } }) {
                   <div style={{
                     marginBottom: '1rem',
                     padding: '1rem',
-                    backgroundColor: `${awayTeam?.color_primary || '#3B82F6'}10`,
-                    border: `2px solid ${awayTeam?.color_primary || '#3B82F6'}`,
+                    backgroundColor: `${awayJerseyColor}10`,
+                    border: `2px solid ${awayJerseyColor}`,
                     borderRadius: '0.5rem'
                   }}>
                     <div style={{ 
                       fontSize: '0.875rem', 
                       fontWeight: 600, 
-                      color: awayTeam?.color_primary || '#3B82F6',
+                      color: awayJerseyColor,
                       marginBottom: '0.75rem'
                     }}>
                       Selected Lineup ({selectedAwayPlayers.length}/7)
@@ -2090,7 +2097,7 @@ export default function GamePage({ params }: { params: { id: string } }) {
                             onClick={() => togglePlayerSelection(playerId, game.team_away_id)}
                             style={{
                               padding: '0.5rem 0.75rem',
-                              backgroundColor: awayTeam?.color_primary || '#3B82F6',
+                              backgroundColor: awayJerseyColor,
                               color: 'white',
                               borderRadius: '0.375rem',
                               fontSize: '0.875rem',
@@ -2114,7 +2121,7 @@ export default function GamePage({ params }: { params: { id: string } }) {
                 )}
                 <h3 style={{ 
                   marginBottom: '1rem',
-                  color: awayTeam?.color_primary || 'var(--text-primary)',
+                  color: awayJerseyColor,
                   display: 'flex',
                   alignItems: 'center',
                   gap: '0.5rem'
@@ -2124,7 +2131,7 @@ export default function GamePage({ params }: { params: { id: string } }) {
                       width: '20px',
                       height: '20px',
                       borderRadius: '50%',
-                      backgroundColor: awayTeam?.color_primary || '#000'
+                      backgroundColor: awayJerseyColor
                     }}
                   />
                   {awayTeam?.name || 'Away Team'}
@@ -2139,7 +2146,7 @@ export default function GamePage({ params }: { params: { id: string } }) {
                   maxHeight: '400px',
                   overflowY: 'auto',
                   padding: '0.5rem',
-                  border: `2px solid ${awayTeam?.color_primary || '#e5e7eb'}`,
+                  border: `2px solid ${awayJerseyColor}`,
                   borderRadius: '0.5rem'
                 }}>
                   {awayPlayers.length === 0 ? (
@@ -2156,10 +2163,10 @@ export default function GamePage({ params }: { params: { id: string } }) {
                             disabled={!isSelected && selectedAwayPlayers.length >= 7}
                             style={{
                               padding: '0.75rem',
-                              border: `2px solid ${isSelected ? awayTeam?.color_primary || '#3B82F6' : 'var(--border-color)'}`,
+                              border: `2px solid ${isSelected ? awayJerseyColor : 'var(--border-color)'}`,
                               borderRadius: '0.5rem',
                               backgroundColor: isSelected 
-                                ? `${awayTeam?.color_primary || '#3B82F6'}20` 
+                                ? `${awayJerseyColor}20` 
                                 : 'var(--bg-secondary)',
                               cursor: (!isSelected && selectedAwayPlayers.length >= 7) ? 'not-allowed' : 'pointer',
                               opacity: (!isSelected && selectedAwayPlayers.length >= 7) ? 0.5 : 1,
@@ -2173,13 +2180,13 @@ export default function GamePage({ params }: { params: { id: string } }) {
                             <span style={{ 
                               fontWeight: 600, 
                               minWidth: '30px',
-                              color: isSelected ? awayTeam?.color_primary || '#3B82F6' : 'var(--text-primary)'
+                              color: isSelected ? awayJerseyColor : 'var(--text-primary)'
                             }}>
                               #{player.number}
                             </span>
                             <span style={{ flex: 1, color: 'var(--text-primary)' }}>{player.name}</span>
                             {isSelected && (
-                              <span style={{ color: awayTeam?.color_primary || '#3B82F6', fontSize: '1.25rem' }}>
+                              <span style={{ color: awayJerseyColor, fontSize: '1.25rem' }}>
                                 ✓
                               </span>
                             )}

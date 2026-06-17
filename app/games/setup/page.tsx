@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/app/components/AuthProvider'
 
@@ -13,22 +14,33 @@ interface Team {
 }
 
 export default function GameSetupPage() {
+  const router = useRouter()
   const { user } = useAuth()
   const [teams, setTeams] = useState<Team[]>([])
-  const [homeTeamId, setHomeTeamId] = useState<string>('')
-  const [awayTeamId, setAwayTeamId] = useState<string>('')
+  const [teamOneId, setTeamOneId] = useState<string>('')
+  const [teamTwoId, setTeamTwoId] = useState<string>('')
+  const [teamOneJerseyColor, setTeamOneJerseyColor] = useState('#3B82F6')
+  const [teamTwoJerseyColor, setTeamTwoJerseyColor] = useState('#EF4444')
   const [pullingTeamId, setPullingTeamId] = useState<string>('')
   const [gameLocation, setGameLocation] = useState('')
   const [gameName, setGameName] = useState('')
-  const [tournamentName, setTournamentName] = useState('')
   const [pointsToWin, setPointsToWin] = useState<number>(15)
+  const [creating, setCreating] = useState(false)
 
-  // Set default pulling team when both teams are selected
+  const bothTeamsSelected = Boolean(
+    teamOneId && teamTwoId && teamOneId !== teamTwoId
+  )
+
   useEffect(() => {
-    if (homeTeamId && awayTeamId && !pullingTeamId) {
-      setPullingTeamId(homeTeamId) // Default to home team pulling first
+    if (!teamOneId || !teamTwoId || teamOneId === teamTwoId) {
+      setPullingTeamId('')
+      return
     }
-  }, [homeTeamId, awayTeamId, pullingTeamId])
+    setPullingTeamId((prev) => {
+      if (prev === teamOneId || prev === teamTwoId) return prev
+      return teamOneId
+    })
+  }, [teamOneId, teamTwoId])
 
   useEffect(() => {
     loadTeams()
@@ -39,16 +51,15 @@ export default function GameSetupPage() {
       let query = supabase
         .from('teams')
         .select('*')
-      
-      // Filter by user_id if logged in, or show guest teams if not
+
       if (user) {
         query = query.eq('user_id', user.id)
       } else {
         query = query.is('user_id', null)
       }
-      
+
       const { data, error } = await query.order('name', { ascending: true })
-      
+
       if (error) throw error
       setTeams(data || [])
     } catch (error) {
@@ -56,14 +67,26 @@ export default function GameSetupPage() {
     }
   }
 
+  const handleTeamSelect = (teamId: string, setTeamId: (id: string) => void) => {
+    setTeamId(teamId)
+  }
+
+  const handlePullCheck = (teamId: string, checked: boolean) => {
+    if (checked) {
+      setPullingTeamId(teamId)
+    } else if (pullingTeamId === teamId) {
+      setPullingTeamId('')
+    }
+  }
+
   const createGame = async () => {
-    if (!homeTeamId || !awayTeamId) {
-      alert('Please select both home and away teams')
+    if (!teamOneId || !teamTwoId) {
+      alert('Please select both teams')
       return
     }
 
-    if (homeTeamId === awayTeamId) {
-      alert('Home and away teams must be different')
+    if (teamOneId === teamTwoId) {
+      alert('Teams must be different')
       return
     }
 
@@ -72,37 +95,31 @@ export default function GameSetupPage() {
       return
     }
 
+    if (!gameName.trim()) {
+      alert('Please enter a game name')
+      return
+    }
+
     if (!pointsToWin || pointsToWin < 1) {
       alert('Please enter a valid number of points to win (must be at least 1)')
       return
     }
 
+    setCreating(true)
+
     try {
       const gameData: any = {
-        team_home_id: homeTeamId,
-        team_away_id: awayTeamId,
+        team_home_id: teamOneId,
+        team_away_id: teamTwoId,
         pulling_team_id: pullingTeamId,
+        team_home_jersey_color: teamOneJerseyColor,
+        team_away_jersey_color: teamTwoJerseyColor,
         home_score: 0,
         away_score: 0,
         points_to_win: pointsToWin,
         location: gameLocation.trim() || null,
-        user_id: user?.id || null
-      }
-
-      // Only include name if it's provided (in case the column doesn't exist yet)
-      if (gameName.trim()) {
-        gameData.name = gameName.trim()
-      }
-
-      // Only include tournament_name if it's provided
-      // Note: Make sure to run the add_tournament_name.sql migration first
-      if (tournamentName.trim()) {
-        try {
-          gameData.tournament_name = tournamentName.trim()
-        } catch (e) {
-          // Column might not exist yet - silently skip
-          console.warn('tournament_name column may not exist in database')
-        }
+        user_id: user?.id || null,
+        name: gameName.trim(),
       }
 
       const { data, error } = await supabase
@@ -116,170 +133,178 @@ export default function GameSetupPage() {
         throw error
       }
 
-      // Redirect to game page (to be created in Phase 2)
-      window.location.href = `/games/${data.id}`
+      if (!data?.id) {
+        throw new Error('Game was created but no ID was returned')
+      }
+
+      router.push(`/games/${data.id}`)
     } catch (error: any) {
       console.error('Error creating game:', error)
       const errorMessage = error?.message || 'Unknown error occurred'
-      alert(`Failed to create game: ${errorMessage}\n\nIf you see a column error, you may need to add a "name" column to the games table.`)
+      alert(`Failed to create game: ${errorMessage}`)
+      setCreating(false)
     }
+  }
+
+  const renderTeamColumn = (
+    label: string,
+    teamId: string,
+    setTeamId: (id: string) => void,
+    jerseyColor: string,
+    setJerseyColor: (color: string) => void,
+    otherTeamId: string
+  ) => {
+    return (
+      <div className="team-picker-column">
+        <label className="team-picker-sublabel">{label}</label>
+        <select
+          className="input"
+          value={teamId}
+          onChange={(e) =>
+            handleTeamSelect(e.target.value, setTeamId)
+          }
+        >
+          <option value="">Select team...</option>
+          {teams.map((team) => (
+            <option
+              key={team.id}
+              value={team.id}
+              disabled={team.id === otherTeamId}
+            >
+              {team.name}
+            </option>
+          ))}
+        </select>
+
+        {teamId && (
+          <>
+            <div className="jersey-color-picker">
+              <label className="team-picker-sublabel">Jersey color *</label>
+              <input
+                type="color"
+                value={jerseyColor}
+                onChange={(e) => setJerseyColor(e.target.value)}
+                className="color-picker"
+                aria-label={`${label} jersey color`}
+              />
+            </div>
+
+            <label className="pull-check-label">
+              <input
+                type="checkbox"
+                checked={pullingTeamId === teamId}
+                onChange={(e) => handlePullCheck(teamId, e.target.checked)}
+                disabled={!bothTeamsSelected}
+              />
+              <span
+                className="pull-check-color"
+                style={{ backgroundColor: jerseyColor }}
+              />
+              Pulls first
+            </label>
+          </>
+        )}
+      </div>
+    )
   }
 
   return (
     <div className="container">
       <div className="header">
         <Link href="/" className="back-button">← Back</Link>
-        <h1>New Game</h1>
+        <div className="form-group game-name-header">
+          <input
+            type="text"
+            className="input game-name-input"
+            placeholder="e.g., Cal vs Slugs — Pool Play"
+            value={gameName}
+            onChange={(e) => setGameName(e.target.value)}
+            required
+          />
+        </div>
       </div>
 
       <div className="game-setup-form">
-        <div className="form-group">
-          <label>Game Name (optional)</label>
-          <input
-            type="text"
-            placeholder="e.g., President's Day Invite Pool Play: Cal vs Santa Cruz"
-            value={gameName}
-            onChange={(e) => setGameName(e.target.value)}
-            className="input"
-          />
-        </div>
-
-        <div className="form-group">
-          <label>Location (optional)</label>
-          <input
-            type="text"
-            placeholder="e.g., Practice Field"
-            value={gameLocation}
-            onChange={(e) => setGameLocation(e.target.value)}
-            className="input"
-          />
-        </div>
-
-        <div className="form-group">
-          <label>Tournament Name (optional)</label>
-          <input
-            type="text"
-            placeholder="e.g., President's Day Invite"
-            value={tournamentName}
-            onChange={(e) => setTournamentName(e.target.value)}
-            className="input"
-          />
-        </div>
-
-        <div className="form-group">
-          <label>Points to Win *</label>
-          <input
-            type="number"
-            min="1"
-            max="50"
-            placeholder="e.g., 15"
-            value={pointsToWin}
-            onChange={(e) => setPointsToWin(parseInt(e.target.value) || 15)}
-            className="input"
-            required
-          />
-          <p style={{ fontSize: '0.875rem', color: '#6b7280', marginTop: '0.5rem' }}>
-            First team to reach this score wins the game (common: 15 or 21)
-          </p>
-        </div>
-
-        <div className="team-selection">
-          <div className="team-selection-group">
-            <h2>Home Team</h2>
-            <div className="team-options">
-              {teams.map(team => (
-                <button
-                  key={team.id}
-                  className={`team-option ${homeTeamId === team.id ? 'selected' : ''}`}
-                  onClick={() => setHomeTeamId(team.id)}
-                  style={{
-                    borderColor: homeTeamId === team.id ? team.color_primary : '#e5e7eb',
-                    backgroundColor: homeTeamId === team.id ? `${team.color_primary}20` : 'transparent'
-                  }}
-                >
-                  <div
-                    className="team-option-color"
-                    style={{ backgroundColor: team.color_primary }}
-                  />
-                  <span>{team.name}</span>
-                </button>
-              ))}
-            </div>
-          </div>
-
-          <div className="team-selection-group">
-            <h2>Away Team</h2>
-            <div className="team-options">
-              {teams.map(team => (
-                <button
-                  key={team.id}
-                  className={`team-option ${awayTeamId === team.id ? 'selected' : ''}`}
-                  onClick={() => setAwayTeamId(team.id)}
-                  style={{
-                    borderColor: awayTeamId === team.id ? team.color_primary : '#e5e7eb',
-                    backgroundColor: awayTeamId === team.id ? `${team.color_primary}20` : 'transparent'
-                  }}
-                >
-                  <div
-                    className="team-option-color"
-                    style={{ backgroundColor: team.color_primary }}
-                  />
-                  <span>{team.name}</span>
-                </button>
-              ))}
-            </div>
-          </div>
-        </div>
-
-        {homeTeamId && awayTeamId && (
-          <div className="team-selection-group" style={{ marginTop: '2rem' }}>
-            <h2>Pulling Team (Pulls First)</h2>
-            <p style={{ fontSize: '0.875rem', color: '#6b7280', marginBottom: '1rem' }}>
-              Select which team pulls first. After that, the team that scores each point will pull the next point.
-            </p>
-            <div className="team-options">
-              {[homeTeamId, awayTeamId].map(teamId => {
-                const team = teams.find(t => t.id === teamId)
-                if (!team) return null
-                return (
-                  <button
-                    key={teamId}
-                    className={`team-option ${pullingTeamId === teamId ? 'selected' : ''}`}
-                    onClick={() => setPullingTeamId(teamId)}
-                    style={{
-                      borderColor: pullingTeamId === teamId ? team.color_primary : '#e5e7eb',
-                      backgroundColor: pullingTeamId === teamId ? `${team.color_primary}20` : 'transparent'
-                    }}
-                  >
-                    <div
-                      className="team-option-color"
-                      style={{ backgroundColor: team.color_primary }}
-                    />
-                    <span>{team.name}</span>
-                  </button>
-                )
-              })}
-            </div>
-          </div>
-        )}
-
-        {teams.length === 0 && (
+        {teams.length === 0 ? (
           <div className="empty-state-container">
             <p>No teams available. Please create teams first.</p>
             <Link href="/teams" className="primary-button">
               Go to Teams
             </Link>
           </div>
-        )}
+        ) : (
+          <>
+            <div className="form-group">
+              <label>Teams *</label>
+              <div className="team-pickers-row">
+                {renderTeamColumn(
+                  'Team 1',
+                  teamOneId,
+                  setTeamOneId,
+                  teamOneJerseyColor,
+                  setTeamOneJerseyColor,
+                  teamTwoId
+                )}
+                {renderTeamColumn(
+                  'Team 2',
+                  teamTwoId,
+                  setTeamTwoId,
+                  teamTwoJerseyColor,
+                  setTeamTwoJerseyColor,
+                  teamOneId
+                )}
+              </div>
+              <p className="form-hint">
+                The team that scores each point pulls the next point.
+              </p>
+            </div>
 
-        {teams.length > 0 && (
-          <button
-            onClick={createGame}
-            disabled={!homeTeamId || !awayTeamId || !pullingTeamId || !pointsToWin || pointsToWin < 1}
-            className="primary-button large"
-          >
-            Start Game
-          </button>
+            <div className="form-group">
+              <label>Location (optional)</label>
+              <input
+                type="text"
+                placeholder="e.g., Practice Field"
+                value={gameLocation}
+                onChange={(e) => setGameLocation(e.target.value)}
+                className="input"
+              />
+            </div>
+
+            <div className="form-group">
+              <label>Points to Win *</label>
+              <input
+                type="number"
+                min="1"
+                max="50"
+                placeholder="e.g., 15"
+                value={pointsToWin}
+                onChange={(e) => setPointsToWin(parseInt(e.target.value) || 15)}
+                className="input"
+                required
+              />
+              <p className="form-hint">
+                First team to reach this score wins the game (common: 15 or 21)
+              </p>
+            </div>
+
+            <button
+              type="button"
+              onClick={createGame}
+              disabled={
+                creating ||
+                !gameName.trim() ||
+                !teamOneId ||
+                !teamTwoId ||
+                teamOneId === teamTwoId ||
+                !pullingTeamId ||
+                !pointsToWin ||
+                pointsToWin < 1
+              }
+              className="primary-button large"
+            >
+              {creating ? 'Starting...' : 'Start Game'}
+            </button>
+          </>
         )}
       </div>
     </div>

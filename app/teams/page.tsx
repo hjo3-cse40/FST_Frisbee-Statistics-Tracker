@@ -29,7 +29,6 @@ export default function TeamsPage() {
   const [expandedTeam, setExpandedTeam] = useState<string | null>(null)
   const [showCreateTeam, setShowCreateTeam] = useState(false)
   const [newTeamName, setNewTeamName] = useState('')
-  const [newTeamColor, setNewTeamColor] = useState('#3B82F6')
   const [showAddPlayer, setShowAddPlayer] = useState<string | null>(null)
   const [newPlayerName, setNewPlayerName] = useState('')
   const [newPlayerJersey, setNewPlayerJersey] = useState('')
@@ -130,7 +129,7 @@ export default function TeamsPage() {
     try {
       const teamData: any = {
         name: newTeamName,
-        color_primary: newTeamColor,
+        color_primary: '#808080',
         user_id: user?.id || null
       }
 
@@ -144,7 +143,6 @@ export default function TeamsPage() {
       
       setTeams([data, ...teams])
       setNewTeamName('')
-      setNewTeamColor('#3B82F6')
       setShowCreateTeam(false)
     } catch (error) {
       console.error('Error creating team:', error)
@@ -372,15 +370,6 @@ export default function TeamsPage() {
               onChange={(e) => setNewTeamName(e.target.value)}
               className="input"
             />
-            <div className="color-picker-group">
-              <label>Team Color:</label>
-              <input
-                type="color"
-                value={newTeamColor}
-                onChange={(e) => setNewTeamColor(e.target.value)}
-                className="color-picker"
-              />
-            </div>
             <div className="modal-actions">
               <button onClick={() => setShowCreateTeam(false)} className="secondary-button">
                 Cancel
@@ -405,10 +394,6 @@ export default function TeamsPage() {
                 onClick={() => setExpandedTeam(isExpanded ? null : team.id)}
               >
                 <div className="team-info">
-                  <div 
-                    className="team-color-indicator"
-                    style={{ backgroundColor: team.color_primary }}
-                  />
                   <div>
                     {editingTeam === team.id ? (
                       <div onClick={(e) => e.stopPropagation()} style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
