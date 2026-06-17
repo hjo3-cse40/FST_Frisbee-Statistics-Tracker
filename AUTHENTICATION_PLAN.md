@@ -201,3 +201,5 @@ CREATE POLICY "Users can delete their own teams" ON teams
 4. **Public Games**: Should there be an option to make games public/private?
 
 
+
+

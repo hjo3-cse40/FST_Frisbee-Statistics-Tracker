@@ -78,3 +78,5 @@ CREATE POLICY "Users can delete their own games" ON games
   FOR DELETE USING (auth.uid() = user_id);
 
 
+
+
