@@ -4,6 +4,8 @@ import { useState, useEffect, useRef } from 'react'
 import Link from 'next/link'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/app/components/AuthProvider'
+import { jerseyTint, resolveJerseyColor, contrastingTextColor } from '@/lib/jerseyColor'
+import { recalculateGameScore } from '@/lib/recalculateGameScore'
 
 interface Game {
   id: string
@@ -83,7 +85,21 @@ export default function GamePage({ params }: { params: { id: string } }) {
   const [pendingDefensiveEventType, setPendingDefensiveEventType] = useState<'block' | 'interception' | 'callahan' | null>(null)
   const [showOffensiveCauseSelection, setShowOffensiveCauseSelection] = useState(false)
   const [pendingDefensiveEventConfirmed, setPendingDefensiveEventConfirmed] = useState<{ playerId: string, eventType: 'block' | 'interception' | 'callahan', isTurnover: boolean } | null>(null)
+  const [gameNameValue, setGameNameValue] = useState('')
+  const [pointEditMode, setPointEditMode] = useState(false)
   const activePointRef = useRef<HTMLDivElement>(null)
+  const pointEditModeRef = useRef(false)
+  const pointEditSnapshotRef = useRef<{ events: Event[]; scoringTeamId: string | null } | null>(null)
+
+  useEffect(() => {
+    pointEditModeRef.current = pointEditMode
+  }, [pointEditMode])
+
+  useEffect(() => {
+    if (game) {
+      setGameNameValue(game.name || game.location || '')
+    }
+  }, [game?.id, game?.name, game?.location])
 
   useEffect(() => {
     loadGame()
@@ -143,6 +159,10 @@ export default function GamePage({ params }: { params: { id: string } }) {
 
       if (error) throw error
       setPoints(data || [])
+
+      if (pointEditModeRef.current) {
+        return
+      }
       
       // Set the most recent incomplete point as active
       const incompletePoint = data?.find(p => !p.scoring_team_id)
@@ -179,6 +199,8 @@ export default function GamePage({ params }: { params: { id: string } }) {
 
         if (playersError) throw playersError
         setActivePointPlayers(playersData || [])
+      } else {
+        setActivePointPlayers([])
       }
 
       // Load events for this point
@@ -481,7 +503,7 @@ export default function GamePage({ params }: { params: { id: string } }) {
       
       // Automatically complete the point for the defender's team
       // Pass fresh events to avoid state timing issues
-      await completePoint(player.team_id, updatedEvents as Event[])
+      await finishPoint(player.team_id, updatedEvents as Event[])
       
       // Close any open modals
       setShowStatButtons(null)
@@ -591,58 +613,271 @@ export default function GamePage({ params }: { params: { id: string } }) {
     }
   }
 
+  const getLastCompletedPoint = (): Point | null => {
+    const completed = points.filter(p => p.scoring_team_id)
+    return completed.length > 0 ? completed[completed.length - 1] : null
+  }
+
+  const deriveScoringTeamId = (eventsToCheck: Event[]): string | null => {
+    const callahanEvents = eventsToCheck.filter(e => e.event_type === 'callahan')
+    if (callahanEvents.length > 0) {
+      const player = activePointPlayers.find(p => p.id === callahanEvents[0].player_id)
+      return player?.team_id ?? null
+    }
+
+    const goalsWithAssists = eventsToCheck.filter(e => e.event_type === 'goal' && e.assist_player_id)
+    if (goalsWithAssists.length > 0) {
+      const goalScorer = activePointPlayers.find(p => p.id === goalsWithAssists[0].player_id)
+      return goalScorer?.team_id ?? null
+    }
+
+    return null
+  }
+
+  const validatePointCompletion = (
+    eventsToCheck: Event[],
+    scoringTeamId: string
+  ): string | null => {
+    if (!game) return 'Game not loaded'
+
+    const goalEvents = eventsToCheck.filter(e => e.event_type === 'goal')
+    const callahanEvents = eventsToCheck.filter(e => e.event_type === 'callahan')
+
+    if (goalEvents.length === 0 && callahanEvents.length === 0) {
+      return 'Cannot complete point: No goal has been recorded. Please record at least one goal before completing the point.'
+    }
+
+    const goalsWithAssists = goalEvents.filter(e => e.assist_player_id !== null)
+    if (goalsWithAssists.length === 0 && callahanEvents.length === 0) {
+      return 'Cannot complete point: No goal has an assist recorded. Please record a goal with an assist before completing the point.'
+    }
+
+    const { pullingTeamId, receivingTeamId } = getPullingAndReceivingTeams()
+    if (pullingTeamId && scoringTeamId === pullingTeamId) {
+      const receivingTeamTurnovers = eventsToCheck.filter(e => {
+        if (!e.is_turnover) return false
+
+        const turnoverPlayer = activePointPlayers.find(p => p.id === e.player_id)
+        if (!turnoverPlayer) return false
+
+        if (
+          (e.event_type === 'interception' || e.event_type === 'block' || e.event_type === 'd' || e.event_type === 'callahan') &&
+          turnoverPlayer.team_id === pullingTeamId
+        ) {
+          return true
+        }
+
+        return turnoverPlayer.team_id === receivingTeamId
+      })
+
+      if (receivingTeamTurnovers.length === 0) {
+        const receivingTeam = receivingTeamId === game.team_home_id ? homeTeam : awayTeam
+        return `Cannot complete point: ${receivingTeam?.name || 'The receiving team'} must have at least one turnover before the pulling team can score.`
+      }
+    }
+
+    return null
+  }
+
+  const saveGameName = async () => {
+    if (!game) return
+
+    const trimmed = gameNameValue.trim()
+    const savedDisplay = game.name || game.location || ''
+
+    if (!trimmed) {
+      setGameNameValue(savedDisplay)
+      return
+    }
+
+    if (trimmed === (game.name ?? '')) {
+      setGameNameValue(trimmed)
+      return
+    }
+
+    const { error } = await supabase
+      .from('games')
+      .update({ name: trimmed })
+      .eq('id', game.id)
+
+    if (error) {
+      alert(`Failed to update game name: ${error.message}`)
+      setGameNameValue(savedDisplay)
+      return
+    }
+
+    setGame({ ...game, name: trimmed })
+    setGameNameValue(trimmed)
+  }
+
+  const restorePointSnapshot = async (pointId: string) => {
+    const snapshot = pointEditSnapshotRef.current
+    if (!snapshot || !game) return
+
+    const { error: deleteError } = await supabase
+      .from('events')
+      .delete()
+      .eq('point_id', pointId)
+
+    if (deleteError) throw deleteError
+
+    if (snapshot.events.length > 0) {
+      const rows = snapshot.events.map(e => ({
+        point_id: e.point_id,
+        event_type: e.event_type,
+        player_id: e.player_id,
+        assist_player_id: e.assist_player_id,
+        sequence_number: e.sequence_number,
+        is_turnover: e.is_turnover,
+        team_id: e.team_id,
+      }))
+
+      const { error: insertError } = await supabase.from('events').insert(rows)
+      if (insertError) throw insertError
+    }
+
+    const { error: pointError } = await supabase
+      .from('points')
+      .update({ scoring_team_id: snapshot.scoringTeamId })
+      .eq('id', pointId)
+
+    if (pointError) throw pointError
+
+    await recalculateGameScore(game.id, game.team_home_id, game.team_away_id)
+  }
+
+  const startEditingLastPoint = async () => {
+    const lastPoint = getLastCompletedPoint()
+    if (!lastPoint || !game) return
+
+    const { data: eventsData, error } = await supabase
+      .from('events')
+      .select('*')
+      .eq('point_id', lastPoint.id)
+      .order('sequence_number', { ascending: true })
+
+    if (error) {
+      alert(`Failed to load point events: ${error.message}`)
+      return
+    }
+
+    pointEditSnapshotRef.current = {
+      events: (eventsData ?? []) as Event[],
+      scoringTeamId: lastPoint.scoring_team_id,
+    }
+
+    pointEditModeRef.current = true
+    setPointEditMode(true)
+    setActivePoint(lastPoint)
+    await loadActivePointData(lastPoint.id)
+
+    setTimeout(() => {
+      activePointRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    }, 100)
+  }
+
+  const cancelPointEdit = async () => {
+    if (!activePoint || !game) return
+
+    try {
+      await restorePointSnapshot(activePoint.id)
+      pointEditSnapshotRef.current = null
+      pointEditModeRef.current = false
+      setPointEditMode(false)
+      setActivePoint(null)
+      setActivePointPlayers([])
+      setEvents([])
+      await loadGame()
+      await loadPoints()
+    } catch (error: unknown) {
+      console.error('Error canceling point edit:', error)
+      alert('Failed to cancel edits. Please refresh the page.')
+    }
+  }
+
+  const savePointEdit = async (eventsOverride?: Event[]) => {
+    if (!activePoint || !game || !pointEditMode) return
+
+    const eventsToCheck = eventsOverride || events
+    const scoringTeamId = deriveScoringTeamId(eventsToCheck)
+
+    if (!scoringTeamId) {
+      alert('Cannot save: unable to determine which team scored.')
+      return
+    }
+
+    const validationError = validatePointCompletion(eventsToCheck, scoringTeamId)
+    if (validationError) {
+      alert(validationError)
+      return
+    }
+
+    try {
+      const { error: pointError } = await supabase
+        .from('points')
+        .update({ scoring_team_id: scoringTeamId })
+        .eq('id', activePoint.id)
+
+      if (pointError) throw pointError
+
+      const { homeScore, awayScore } = await recalculateGameScore(
+        game.id,
+        game.team_home_id,
+        game.team_away_id
+      )
+
+      pointEditSnapshotRef.current = null
+      pointEditModeRef.current = false
+      setPointEditMode(false)
+      setActivePoint(null)
+      setActivePointPlayers([])
+      setEvents([])
+
+      await loadGame()
+      await loadPoints()
+
+      setTimeout(() => {
+        window.scrollTo({ top: 0, behavior: 'smooth' })
+      }, 100)
+
+      const winningTeam =
+        homeScore >= game.points_to_win
+          ? homeTeam
+          : awayScore >= game.points_to_win
+            ? awayTeam
+            : null
+
+      if (winningTeam) {
+        setTimeout(() => {
+          alert(`🎉 ${winningTeam.name} wins! Final score: ${homeScore}-${awayScore}`)
+        }, 500)
+      }
+    } catch (error: unknown) {
+      console.error('Error saving point edit:', error)
+      const message = error instanceof Error ? error.message : 'Unknown error'
+      alert(`Failed to save point changes: ${message}`)
+    }
+  }
+
+  const finishPoint = async (scoringTeamId: string, eventsOverride?: Event[]) => {
+    if (pointEditMode) {
+      await savePointEdit(eventsOverride)
+    } else {
+      await completePoint(scoringTeamId, eventsOverride)
+    }
+  }
+
   const completePoint = async (scoringTeamId: string, eventsOverride?: Event[]) => {
     if (!activePoint || !game) return
 
     // Use provided events or fall back to state
     const eventsToCheck = eventsOverride || events
 
-    // Validate that there is at least one goal with an assist (or a callahan, which doesn't need an assist)
-    const goalEvents = eventsToCheck.filter(e => e.event_type === 'goal')
-    const callahanEvents = eventsToCheck.filter(e => e.event_type === 'callahan')
-    
-    if (goalEvents.length === 0 && callahanEvents.length === 0) {
-      alert('Cannot complete point: No goal has been recorded. Please record at least one goal before completing the point.')
+    const validationError = validatePointCompletion(eventsToCheck, scoringTeamId)
+    if (validationError) {
+      alert(validationError)
       return
     }
-
-    // Check if at least one goal has an assist (callahans don't need assists)
-    const goalsWithAssists = goalEvents.filter(e => e.assist_player_id !== null)
-    
-    if (goalsWithAssists.length === 0 && callahanEvents.length === 0) {
-      alert('Cannot complete point: No goal has an assist recorded. Please record a goal with an assist before completing the point.')
-      return
-    }
-
-        // Validate that if pulling team scored, receiving team had a turnover
-        const { pullingTeamId, receivingTeamId } = getPullingAndReceivingTeams()
-        
-        if (pullingTeamId && scoringTeamId === pullingTeamId) {
-          // Check if receiving team has any turnovers
-          // This includes:
-          // 1. Turnovers by receiving team players (throwaway, drop, stall)
-          // 2. Blocks/interceptions by pulling team (defense gets block/interception = receiving team loses possession)
-          const receivingTeamTurnovers = eventsToCheck.filter(e => {
-            if (!e.is_turnover) return false
-            
-            const turnoverPlayer = activePointPlayers.find(p => p.id === e.player_id)
-            if (!turnoverPlayer) return false
-            
-            // If it's a block, interception, or callahan by the pulling team, it counts as a turnover by the receiving team
-            if ((e.event_type === 'interception' || e.event_type === 'block' || e.event_type === 'd' || e.event_type === 'callahan') && turnoverPlayer.team_id === pullingTeamId) {
-              return true
-            }
-            
-            // Otherwise, check if the turnover was by a receiving team player
-            return turnoverPlayer.team_id === receivingTeamId
-          })
-
-          if (receivingTeamTurnovers.length === 0) {
-            const receivingTeam = receivingTeamId === game.team_home_id ? homeTeam : awayTeam
-            alert(`Cannot complete point: ${receivingTeam?.name || 'The receiving team'} must have at least one turnover before the pulling team can score.`)
-            return
-          }
-        }
 
     try {
       // Update the point to mark it as scored
@@ -769,7 +1004,7 @@ export default function GamePage({ params }: { params: { id: string } }) {
   }
 
   const startNewPoint = async () => {
-    if (!game || !homeTeam || !awayTeam) return
+    if (!game || !homeTeam || !awayTeam || pointEditMode) return
 
     // Load players for both teams
     try {
@@ -932,16 +1167,39 @@ export default function GamePage({ params }: { params: { id: string } }) {
     )
   }
 
-  const homeJerseyColor =
-    game.team_home_jersey_color ?? homeTeam?.color_primary ?? '#3B82F6'
-  const awayJerseyColor =
-    game.team_away_jersey_color ?? awayTeam?.color_primary ?? '#EF4444'
+  const homeJerseyColor = resolveJerseyColor(
+    game.team_home_jersey_color,
+    homeTeam?.color_primary,
+    '#3B82F6'
+  )
+  const awayJerseyColor = resolveJerseyColor(
+    game.team_away_jersey_color,
+    awayTeam?.color_primary,
+    '#EF4444'
+  )
+  const lastCompletedPoint = getLastCompletedPoint()
 
   return (
     <div className="container">
       <div className="header">
         <Link href="/" className="back-button">← Back</Link>
-        <h1>{game.name || game.location || 'Game'}</h1>
+        <input
+          type="text"
+          value={gameNameValue}
+          onChange={(e) => setGameNameValue(e.target.value)}
+          onBlur={saveGameName}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') {
+              e.currentTarget.blur()
+            } else if (e.key === 'Escape') {
+              setGameNameValue(game.name || game.location || '')
+              e.currentTarget.blur()
+            }
+          }}
+          className="input game-name-input"
+          placeholder={game.location || 'Game name'}
+          aria-label="Game name"
+        />
         {game.name && game.location && (
           <p className="subtitle">{game.location}</p>
         )}
@@ -1054,20 +1312,80 @@ export default function GamePage({ params }: { params: { id: string } }) {
       <div style={{ marginTop: '2rem' }}>
         {(() => {
           const gameIsOver = game.home_score >= game.points_to_win || game.away_score >= game.points_to_win
+          if (gameIsOver) {
+            return (
+              <>
+                {lastCompletedPoint && !pointEditMode && (
+                  <button
+                    onClick={startEditingLastPoint}
+                    className="secondary-button large"
+                    style={{
+                      width: '100%',
+                      marginBottom: '0.75rem',
+                    }}
+                  >
+                    Edit Last Point
+                  </button>
+                )}
+                <Link
+                  href={`/games/${params.id}/stats`}
+                  className="primary-button large"
+                  style={{
+                    width: '100%',
+                    marginBottom: '1rem',
+                    display: 'block',
+                    textAlign: 'center',
+                    textDecoration: 'none',
+                  }}
+                >
+                  View Game Stats
+                </Link>
+              </>
+            )
+          }
           return (
-            <button
-              onClick={startNewPoint}
-              disabled={gameIsOver}
-              className="primary-button large"
-              style={{ 
-                width: '100%', 
-                marginBottom: '1rem',
-                opacity: gameIsOver ? 0.5 : 1,
-                cursor: gameIsOver ? 'not-allowed' : 'pointer'
-              }}
-            >
-              {gameIsOver ? 'Game Over' : 'Start New Point'}
-            </button>
+            <>
+              <button
+                onClick={startNewPoint}
+                disabled={pointEditMode}
+                className="primary-button large"
+                style={{
+                  width: '100%',
+                  marginBottom: points.length > 0 ? '0.75rem' : '1rem',
+                  opacity: pointEditMode ? 0.5 : 1,
+                  cursor: pointEditMode ? 'not-allowed' : 'pointer',
+                }}
+              >
+                Start New Point
+              </button>
+              {lastCompletedPoint && !pointEditMode && (
+                <button
+                  onClick={startEditingLastPoint}
+                  className="secondary-button large"
+                  style={{
+                    width: '100%',
+                    marginBottom: '0.75rem',
+                  }}
+                >
+                  Edit Last Point
+                </button>
+              )}
+              {points.length > 0 && (
+                <Link
+                  href={`/games/${params.id}/stats`}
+                  className="secondary-button large"
+                  style={{
+                    width: '100%',
+                    marginBottom: '1rem',
+                    display: 'block',
+                    textAlign: 'center',
+                    textDecoration: 'none',
+                  }}
+                >
+                  View Stats So Far
+                </Link>
+              )}
+            </>
           )
         })()}
 
@@ -1126,9 +1444,23 @@ export default function GamePage({ params }: { params: { id: string } }) {
                         {!point.scoring_team_id && <span style={{ fontSize: '0.875rem', fontWeight: 'normal', color: 'var(--text-quaternary)', marginLeft: '0.5rem' }}>(Point {point.point_number})</span>}
                       </span>
                       {point.scoring_team_id ? (
-                        <span style={{ fontSize: '0.875rem', color: 'var(--text-tertiary)' }}>
-                          Scored by {point.scoring_team_id === game.team_home_id ? homeTeam?.name : awayTeam?.name}
-                        </span>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                          <span style={{ fontSize: '0.875rem', color: 'var(--text-tertiary)' }}>
+                            Scored by {point.scoring_team_id === game.team_home_id ? homeTeam?.name : awayTeam?.name}
+                          </span>
+                          {lastCompletedPoint?.id === point.id && !pointEditMode && (
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                startEditingLastPoint()
+                              }}
+                              className="secondary-button small"
+                              style={{ minHeight: 'auto', padding: '0.25rem 0.75rem', fontSize: '0.75rem' }}
+                            >
+                              Edit
+                            </button>
+                          )}
+                        </div>
                       ) : (
                         <span style={{ fontSize: '0.875rem', color: 'var(--text-quaternary)' }}>In progress</span>
                       )}
@@ -1146,7 +1478,7 @@ export default function GamePage({ params }: { params: { id: string } }) {
         <div ref={activePointRef} style={{ 
           marginTop: '2rem', 
           padding: '1.5rem',
-          border: '2px solid #3B82F6',
+          border: pointEditMode ? '2px solid #f59e0b' : '2px solid #3B82F6',
           borderRadius: '0.75rem',
           backgroundColor: 'var(--bg-tertiary)'
         }}>
@@ -1166,18 +1498,34 @@ export default function GamePage({ params }: { params: { id: string } }) {
               })
               
               return (
-                <h2 style={{ margin: 0 }}>Live Point: {homeScore}-{awayScore}</h2>
+                <h2 style={{ margin: 0 }}>
+                  {pointEditMode ? `Editing Point ${activePoint.point_number}` : `Live Point: ${homeScore}-${awayScore}`}
+                </h2>
               )
             })()}
             <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', alignItems: 'center' }}>
+              {pointEditMode && (
+                <button
+                  onClick={cancelPointEdit}
+                  className="secondary-button"
+                  style={{ fontSize: '0.875rem', padding: '0.5rem 1rem' }}
+                >
+                  Cancel
+                </button>
+              )}
               {(() => {
                 const goalEvents = events.filter(e => e.event_type === 'goal')
                 const goalsWithAssists = goalEvents.filter(e => e.assist_player_id !== null)
-                const canComplete = goalEvents.length > 0 && goalsWithAssists.length > 0
+                const callahanEvents = events.filter(e => e.event_type === 'callahan')
+                const canComplete =
+                  (goalEvents.length > 0 && goalsWithAssists.length > 0) || callahanEvents.length > 0
                 
-                // Determine which team scored based on the first goal with assist
+                // Determine which team scored based on events
                 let scoringTeamId: string | null = null
-                if (canComplete && goalsWithAssists.length > 0) {
+                if (callahanEvents.length > 0) {
+                  const callahanPlayer = activePointPlayers.find(p => p.id === callahanEvents[0].player_id)
+                  scoringTeamId = callahanPlayer?.team_id ?? null
+                } else if (canComplete && goalsWithAssists.length > 0) {
                   const firstGoalWithAssist = goalsWithAssists[0]
                   const goalScorer = activePointPlayers.find(p => p.id === firstGoalWithAssist.player_id)
                   if (goalScorer) {
@@ -1208,7 +1556,7 @@ export default function GamePage({ params }: { params: { id: string } }) {
                         backgroundColor: '#d1fae5',
                         borderRadius: '0.25rem'
                       }}>
-                        ✓ Ready to complete
+                        {pointEditMode ? '✓ Ready to save' : '✓ Ready to complete'}
                       </span>
                     )}
                     {events.length > 0 && (
@@ -1223,8 +1571,12 @@ export default function GamePage({ params }: { params: { id: string } }) {
                     {canComplete && scoringTeamId && (
                       <button
                         onClick={() => {
-                          if (confirm(`Did ${scoringTeamId === game.team_home_id ? homeTeam?.name : awayTeam?.name} score this point?`)) {
-                            completePoint(scoringTeamId)
+                          const teamName = scoringTeamId === game.team_home_id ? homeTeam?.name : awayTeam?.name
+                          const confirmMessage = pointEditMode
+                            ? `Save changes to this point? ${teamName} scored.`
+                            : `Did ${teamName} score this point?`
+                          if (confirm(confirmMessage)) {
+                            finishPoint(scoringTeamId)
                           }
                         }}
                         className="primary-button"
@@ -1236,7 +1588,9 @@ export default function GamePage({ params }: { params: { id: string } }) {
                             : (awayJerseyColor)
                         }}
                       >
-                        {scoringTeamId === game.team_home_id ? (homeTeam?.name || 'Home') : (awayTeam?.name || 'Away')} Scored
+                        {pointEditMode
+                          ? 'Save Changes'
+                          : `${scoringTeamId === game.team_home_id ? (homeTeam?.name || 'Home') : (awayTeam?.name || 'Away')} Scored`}
                       </button>
                     )}
                   </>
@@ -1898,9 +2252,9 @@ export default function GamePage({ params }: { params: { id: string } }) {
 
       {showLineupSelection && (
         <div className="modal-overlay" onClick={() => !loadingLineup && setShowLineupSelection(false)}>
-          <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '90vw', maxHeight: '90vh', overflow: 'auto' }}>
+          <div className="modal modal-lineup" onClick={(e) => e.stopPropagation()}>
             <h2>Select Lineups - Point {points.length + 1}</h2>
-            <p style={{ marginBottom: '1rem', color: '#6b7280', fontSize: '0.875rem' }}>
+            <p style={{ marginBottom: '1rem', color: 'var(--text-tertiary)', fontSize: '0.875rem' }}>
               Select 7 players for each team
             </p>
             <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1.5rem', flexWrap: 'wrap' }}>
@@ -1930,31 +2284,21 @@ export default function GamePage({ params }: { params: { id: string } }) {
               </button>
             </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem', marginBottom: '1.5rem' }}>
+            <div className="lineup-grid">
               {/* Home Team Selection */}
-              <div>
-                {/* Selected Players Display */}
+              <div className="lineup-team-column">
                 {selectedHomePlayers.length > 0 && (
-                  <div style={{
-                    marginBottom: '1rem',
-                    padding: '1rem',
-                    backgroundColor: `${homeJerseyColor}10`,
-                    border: `2px solid ${homeJerseyColor}`,
-                    borderRadius: '0.5rem'
-                  }}>
-                    <div style={{ 
-                      fontSize: '0.875rem', 
-                      fontWeight: 600, 
-                      color: homeJerseyColor,
-                      marginBottom: '0.75rem'
-                    }}>
+                  <div
+                    className="lineup-selected-box"
+                    style={{
+                      backgroundColor: jerseyTint(homeJerseyColor, '10'),
+                      border: `2px solid ${homeJerseyColor}`,
+                    }}
+                  >
+                    <div className="lineup-selected-label">
                       Selected Lineup ({selectedHomePlayers.length}/7)
                     </div>
-                    <div style={{ 
-                      display: 'flex', 
-                      flexWrap: 'wrap', 
-                      gap: '0.5rem'
-                    }}>
+                    <div className="lineup-selected-chips">
                       {selectedHomePlayers.map(playerId => {
                         const player = homePlayers.find(p => p.id === playerId)
                         if (!player) return null
@@ -1962,20 +2306,13 @@ export default function GamePage({ params }: { params: { id: string } }) {
                           <div
                             key={playerId}
                             onClick={() => togglePlayerSelection(playerId, game.team_home_id)}
+                            className="lineup-selected-chip"
                             style={{
-                              padding: '0.5rem 0.75rem',
                               backgroundColor: homeJerseyColor,
-                              color: 'white',
-                              borderRadius: '0.375rem',
-                              fontSize: '0.875rem',
-                              cursor: 'pointer',
-                              display: 'flex',
-                              alignItems: 'center',
-                              gap: '0.5rem',
-                              transition: 'opacity 0.2s'
+                              color: contrastingTextColor(homeJerseyColor),
                             }}
-                            onMouseEnter={(e) => e.currentTarget.style.opacity = '0.8'}
-                            onMouseLeave={(e) => e.currentTarget.style.opacity = '1'}
+                            onMouseEnter={(e) => { e.currentTarget.style.opacity = '0.8' }}
+                            onMouseLeave={(e) => { e.currentTarget.style.opacity = '1' }}
                           >
                             <span style={{ fontWeight: 600 }}>#{player.number}</span>
                             <span>{player.name}</span>
@@ -1986,38 +2323,19 @@ export default function GamePage({ params }: { params: { id: string } }) {
                     </div>
                   </div>
                 )}
-                <h3 style={{ 
-                  marginBottom: '1rem', 
-                  color: homeJerseyColor,
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '0.5rem'
-                }}>
-                  <div
-                    style={{
-                      width: '20px',
-                      height: '20px',
-                      borderRadius: '50%',
-                      backgroundColor: homeJerseyColor
-                    }}
-                  />
+                <h3 className="lineup-team-heading">
+                  <span className="lineup-team-swatch" style={{ backgroundColor: homeJerseyColor }} />
                   {homeTeam?.name || 'Home Team'}
-                  <span style={{ fontSize: '0.875rem', fontWeight: 'normal', color: '#6b7280' }}>
+                  <span style={{ fontSize: '0.875rem', fontWeight: 'normal', color: 'var(--text-tertiary)' }}>
                     ({selectedHomePlayers.length}/7)
                   </span>
                 </h3>
-                <div style={{ 
-                  display: 'flex', 
-                  flexDirection: 'column', 
-                  gap: '0.5rem',
-                  maxHeight: '400px',
-                  overflowY: 'auto',
-                  padding: '0.5rem',
-                  border: `2px solid ${homeJerseyColor}`,
-                  borderRadius: '0.5rem'
-                }}>
+                <div
+                  className="lineup-player-list"
+                  style={{ border: `2px solid ${homeJerseyColor}` }}
+                >
                   {homePlayers.length === 0 ? (
-                    <p style={{ color: '#9ca3af', textAlign: 'center', padding: '1rem' }}>
+                    <p style={{ color: 'var(--text-quaternary)', textAlign: 'center', padding: '1rem' }}>
                       No players available
                     </p>
                   ) : (
@@ -2026,22 +2344,17 @@ export default function GamePage({ params }: { params: { id: string } }) {
                         return (
                           <button
                             key={player.id}
+                            type="button"
                             onClick={() => togglePlayerSelection(player.id, game.team_home_id)}
                             disabled={!isSelected && selectedHomePlayers.length >= 7}
+                            className="lineup-player-button"
                             style={{
-                              padding: '0.75rem',
                               border: `2px solid ${isSelected ? homeJerseyColor : 'var(--border-color)'}`,
-                              borderRadius: '0.5rem',
-                              backgroundColor: isSelected 
-                                ? `${homeJerseyColor}20` 
+                              backgroundColor: isSelected
+                                ? jerseyTint(homeJerseyColor, '20')
                                 : 'var(--bg-secondary)',
                               cursor: (!isSelected && selectedHomePlayers.length >= 7) ? 'not-allowed' : 'pointer',
                               opacity: (!isSelected && selectedHomePlayers.length >= 7) ? 0.5 : 1,
-                              textAlign: 'left',
-                              display: 'flex',
-                              alignItems: 'center',
-                              gap: '0.5rem',
-                              transition: 'all 0.2s'
                             }}
                           >
                             <span style={{ 
@@ -2051,7 +2364,7 @@ export default function GamePage({ params }: { params: { id: string } }) {
                             }}>
                               #{player.number}
                             </span>
-                            <span style={{ flex: 1, color: 'var(--text-primary)' }}>{player.name}</span>
+                            <span style={{ flex: 1 }}>{player.name}</span>
                             {isSelected && (
                               <span style={{ color: homeJerseyColor, fontSize: '1.25rem' }}>
                                 ✓
@@ -2065,29 +2378,19 @@ export default function GamePage({ params }: { params: { id: string } }) {
               </div>
 
               {/* Away Team Selection */}
-              <div>
-                {/* Selected Players Display */}
+              <div className="lineup-team-column">
                 {selectedAwayPlayers.length > 0 && (
-                  <div style={{
-                    marginBottom: '1rem',
-                    padding: '1rem',
-                    backgroundColor: `${awayJerseyColor}10`,
-                    border: `2px solid ${awayJerseyColor}`,
-                    borderRadius: '0.5rem'
-                  }}>
-                    <div style={{ 
-                      fontSize: '0.875rem', 
-                      fontWeight: 600, 
-                      color: awayJerseyColor,
-                      marginBottom: '0.75rem'
-                    }}>
+                  <div
+                    className="lineup-selected-box"
+                    style={{
+                      backgroundColor: jerseyTint(awayJerseyColor, '10'),
+                      border: `2px solid ${awayJerseyColor}`,
+                    }}
+                  >
+                    <div className="lineup-selected-label">
                       Selected Lineup ({selectedAwayPlayers.length}/7)
                     </div>
-                    <div style={{ 
-                      display: 'flex', 
-                      flexWrap: 'wrap', 
-                      gap: '0.5rem'
-                    }}>
+                    <div className="lineup-selected-chips">
                       {selectedAwayPlayers.map(playerId => {
                         const player = awayPlayers.find(p => p.id === playerId)
                         if (!player) return null
@@ -2095,20 +2398,13 @@ export default function GamePage({ params }: { params: { id: string } }) {
                           <div
                             key={playerId}
                             onClick={() => togglePlayerSelection(playerId, game.team_away_id)}
+                            className="lineup-selected-chip"
                             style={{
-                              padding: '0.5rem 0.75rem',
                               backgroundColor: awayJerseyColor,
-                              color: 'white',
-                              borderRadius: '0.375rem',
-                              fontSize: '0.875rem',
-                              cursor: 'pointer',
-                              display: 'flex',
-                              alignItems: 'center',
-                              gap: '0.5rem',
-                              transition: 'opacity 0.2s'
+                              color: contrastingTextColor(awayJerseyColor),
                             }}
-                            onMouseEnter={(e) => e.currentTarget.style.opacity = '0.8'}
-                            onMouseLeave={(e) => e.currentTarget.style.opacity = '1'}
+                            onMouseEnter={(e) => { e.currentTarget.style.opacity = '0.8' }}
+                            onMouseLeave={(e) => { e.currentTarget.style.opacity = '1' }}
                           >
                             <span style={{ fontWeight: 600 }}>#{player.number}</span>
                             <span>{player.name}</span>
@@ -2119,38 +2415,19 @@ export default function GamePage({ params }: { params: { id: string } }) {
                     </div>
                   </div>
                 )}
-                <h3 style={{ 
-                  marginBottom: '1rem',
-                  color: awayJerseyColor,
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '0.5rem'
-                }}>
-                  <div
-                    style={{
-                      width: '20px',
-                      height: '20px',
-                      borderRadius: '50%',
-                      backgroundColor: awayJerseyColor
-                    }}
-                  />
+                <h3 className="lineup-team-heading">
+                  <span className="lineup-team-swatch" style={{ backgroundColor: awayJerseyColor }} />
                   {awayTeam?.name || 'Away Team'}
-                  <span style={{ fontSize: '0.875rem', fontWeight: 'normal', color: '#6b7280' }}>
+                  <span style={{ fontSize: '0.875rem', fontWeight: 'normal', color: 'var(--text-tertiary)' }}>
                     ({selectedAwayPlayers.length}/7)
                   </span>
                 </h3>
-                <div style={{ 
-                  display: 'flex', 
-                  flexDirection: 'column', 
-                  gap: '0.5rem',
-                  maxHeight: '400px',
-                  overflowY: 'auto',
-                  padding: '0.5rem',
-                  border: `2px solid ${awayJerseyColor}`,
-                  borderRadius: '0.5rem'
-                }}>
+                <div
+                  className="lineup-player-list"
+                  style={{ border: `2px solid ${awayJerseyColor}` }}
+                >
                   {awayPlayers.length === 0 ? (
-                    <p style={{ color: '#9ca3af', textAlign: 'center', padding: '1rem' }}>
+                    <p style={{ color: 'var(--text-quaternary)', textAlign: 'center', padding: '1rem' }}>
                       No players available
                     </p>
                   ) : (
@@ -2159,22 +2436,17 @@ export default function GamePage({ params }: { params: { id: string } }) {
                         return (
                           <button
                             key={player.id}
+                            type="button"
                             onClick={() => togglePlayerSelection(player.id, game.team_away_id)}
                             disabled={!isSelected && selectedAwayPlayers.length >= 7}
+                            className="lineup-player-button"
                             style={{
-                              padding: '0.75rem',
                               border: `2px solid ${isSelected ? awayJerseyColor : 'var(--border-color)'}`,
-                              borderRadius: '0.5rem',
-                              backgroundColor: isSelected 
-                                ? `${awayJerseyColor}20` 
+                              backgroundColor: isSelected
+                                ? jerseyTint(awayJerseyColor, '20')
                                 : 'var(--bg-secondary)',
                               cursor: (!isSelected && selectedAwayPlayers.length >= 7) ? 'not-allowed' : 'pointer',
                               opacity: (!isSelected && selectedAwayPlayers.length >= 7) ? 0.5 : 1,
-                              textAlign: 'left',
-                              display: 'flex',
-                              alignItems: 'center',
-                              gap: '0.5rem',
-                              transition: 'all 0.2s'
                             }}
                           >
                             <span style={{ 
@@ -2184,7 +2456,7 @@ export default function GamePage({ params }: { params: { id: string } }) {
                             }}>
                               #{player.number}
                             </span>
-                            <span style={{ flex: 1, color: 'var(--text-primary)' }}>{player.name}</span>
+                            <span style={{ flex: 1 }}>{player.name}</span>
                             {isSelected && (
                               <span style={{ color: awayJerseyColor, fontSize: '1.25rem' }}>
                                 ✓

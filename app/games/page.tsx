@@ -171,7 +171,7 @@ export default function GamesListPage() {
                 </button>
 
               <Link
-                href={`/games/${game.id}`}
+                href={gameIsOver ? `/games/${game.id}/stats` : `/games/${game.id}`}
                 style={{ textDecoration: 'none', color: 'inherit', display: 'block' }}
               >
                 <div
@@ -285,7 +285,7 @@ export default function GamesListPage() {
                     fontSize: '0.75rem', 
                     color: 'var(--text-quaternary)' 
                   }}>
-                    Playing to {game.points_to_win}
+                    {gameIsOver ? 'Tap for game stats' : `Playing to ${game.points_to_win}`}
                   </div>
                 </div>
               </Link>

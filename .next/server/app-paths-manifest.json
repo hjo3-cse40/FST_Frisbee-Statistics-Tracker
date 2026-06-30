@@ -1,4 +1,11 @@
 {
+  "/_not-found/page": "app/_not-found/page.js",
+  "/games/[id]/page": "app/games/[id]/page.js",
+  "/games/[id]/stats/page": "app/games/[id]/stats/page.js",
+  "/games/page": "app/games/page.js",
+  "/games/setup/page": "app/games/setup/page.js",
   "/page": "app/page.js",
+  "/auth/signin/page": "app/auth/signin/page.js",
+  "/auth/signup/page": "app/auth/signup/page.js",
   "/teams/page": "app/teams/page.js"
 }
