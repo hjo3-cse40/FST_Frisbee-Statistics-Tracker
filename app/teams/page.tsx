@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/app/components/AuthProvider'
+import UsauImportModal from '@/app/components/UsauImportModal'
 
 interface Player {
   id: string
@@ -37,6 +38,8 @@ export default function TeamsPage() {
   const [editingPlayerName, setEditingPlayerName] = useState('')
   const [editingTeam, setEditingTeam] = useState<string | null>(null)
   const [editingTeamName, setEditingTeamName] = useState('')
+  const [showUsauImport, setShowUsauImport] = useState(false)
+  const [usauImportTeamId, setUsauImportTeamId] = useState<string | null>(null)
 
   useEffect(() => {
     loadTeams()
@@ -319,6 +322,91 @@ export default function TeamsPage() {
     setEditingTeamName(team.name)
   }
 
+  const openUsauImport = (teamId: string | null = null) => {
+    setUsauImportTeamId(teamId)
+    setShowUsauImport(true)
+  }
+
+  const importUsauPlayers = async ({
+    teamId,
+    createTeamName,
+    players: importPlayers,
+  }: {
+    teamId: string | null
+    createTeamName: string | null
+    players: Array<{ name: string; number: number }>
+  }) => {
+    let targetTeamId = teamId
+
+    if (!targetTeamId) {
+      if (!createTeamName?.trim()) {
+        throw new Error('Team name is required')
+      }
+
+      const teamData: {
+        name: string
+        color_primary: string
+        user_id: string | null
+      } = {
+        name: createTeamName.trim(),
+        color_primary: '#808080',
+        user_id: user?.id || null,
+      }
+
+      const { data: createdTeam, error: teamError } = await supabase
+        .from('teams')
+        .insert([teamData])
+        .select()
+        .single()
+
+      if (teamError) throw teamError
+      targetTeamId = createdTeam.id
+      setTeams((prev) => [createdTeam, ...prev])
+      setExpandedTeam(createdTeam.id)
+    }
+
+    const existingTeamPlayers = players.filter((p) => p.team_id === targetTeamId)
+    const existingKeys = new Set(
+      existingTeamPlayers.map((p) => `${p.name.toLowerCase()}::${p.number}`)
+    )
+
+    const toInsert = importPlayers.filter(
+      (p) => !existingKeys.has(`${p.name.toLowerCase()}::${p.number}`)
+    )
+    const skipped = importPlayers.length - toInsert.length
+
+    if (toInsert.length === 0) {
+      alert(
+        skipped > 0
+          ? 'All selected players already exist on this team.'
+          : 'No players to import.'
+      )
+      return
+    }
+
+    const rows = toInsert.map((player) => ({
+      name: player.name,
+      number: player.number,
+      team_id: targetTeamId,
+      user_id: user?.id || null,
+    }))
+
+    const { data: inserted, error: insertError } = await supabase
+      .from('players')
+      .insert(rows)
+      .select()
+
+    if (insertError) throw insertError
+
+    setPlayers((prev) => [...prev, ...(inserted || [])])
+
+    const parts = [`Imported ${inserted?.length ?? toInsert.length} players.`]
+    if (skipped > 0) {
+      parts.push(`Skipped ${skipped} already on the team.`)
+    }
+    alert(parts.join(' '))
+  }
+
   return (
     <div className="container">
       <div className="header">
@@ -333,6 +421,13 @@ export default function TeamsPage() {
           style={{ flex: '1', minWidth: '200px' }}
         >
           + Create Team
+        </button>
+        <button
+          className="secondary-button"
+          onClick={() => openUsauImport(null)}
+          style={{ flex: '1', minWidth: '200px' }}
+        >
+          Import from USAU
         </button>
         
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
@@ -380,6 +475,18 @@ export default function TeamsPage() {
             </div>
           </div>
         </div>
+      )}
+
+      {showUsauImport && (
+        <UsauImportModal
+          teams={teams.map((team) => ({ id: team.id, name: team.name }))}
+          initialTeamId={usauImportTeamId}
+          onClose={() => {
+            setShowUsauImport(false)
+            setUsauImportTeamId(null)
+          }}
+          onImport={importUsauPlayers}
+        />
       )}
 
       <div className="teams-list">
@@ -474,12 +581,20 @@ export default function TeamsPage() {
 
               {isExpanded && (
                 <div className="team-card-content">
-                  <button
-                    className="add-player-button"
-                    onClick={() => setShowAddPlayer(showAddPlayer === team.id ? null : team.id)}
-                  >
-                    + Add Player
-                  </button>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                    <button
+                      className="add-player-button"
+                      onClick={() => setShowAddPlayer(showAddPlayer === team.id ? null : team.id)}
+                    >
+                      + Add Player
+                    </button>
+                    <button
+                      className="add-player-button"
+                      onClick={() => openUsauImport(team.id)}
+                    >
+                      Import from USAU
+                    </button>
+                  </div>
 
                   {showAddPlayer === team.id && (
                     <div className="add-player-form">
