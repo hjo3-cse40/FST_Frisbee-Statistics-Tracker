@@ -17,10 +17,11 @@ FST runs in your browser — no install required. Works best on a phone or table
 No account required — you can try FST immediately as a guest.
 
 1. Open FST in your browser
-2. Under **Manage Teams & Players**, create teams and add players (name + jersey number)
+2. Under **Manage Teams & Players**, create teams and add players (name + jersey number), or **Import from USAU** with an Event Team URL
 3. Tap **Start New Game**, pick the two teams, and configure the game
 4. For each point: select 7 players per side, then tap a player to record stats
 5. Use **View All Games** anytime to resume an in-progress game or review past results
+6. After a game, open **Game Stats** to review player/team totals and export CSV
 
 
 
@@ -28,8 +29,8 @@ No account required — you can try FST immediately as a guest.
 
 Sign up when you want to keep your data long-term or use FST on another device.
 
-- **Guest mode** — use FST without signing in; teams, players, and games are tied to your current browser session
-- **Sign up** — links any guest data you created in that browser to your account
+- **Guest mode** — use FST without signing in; teams, players, and games are stored with no account attached
+- **Sign up** — links existing guest data to your account
 - **Sign in** — access your saved data from any device
 
 Guest data does not follow you to a new browser or device until you sign up.
@@ -49,17 +50,19 @@ Guest data does not follow you to a new browser or device until you sign up.
 - Possession tracking with turnover confirmation flow
 - 7-player lineups per team, with reload-last-lineup shortcut
 - Live score display and game-over detection (configurable points to win)
-- Game history with scores, status, and team names
-- Team and player management (manual roster entry)
+- Game history with scores, status, team names, and delete
+- Team and player management (manual entry + USAU Event Team roster import)
+- Post-game player and team stat summaries (points played, assists, goals, blocks, turnovers)
+- CSV export of game stats
 - Dark mode
 - Optional accounts with guest mode
+- Deployed on Vercel
 
 
 
 ### Coming soon
 
-- Game-wide player stat summaries and plus/minus
-- CSV roster import and stat export
+- Plus/minus
 - Filter/sort on the games list
 - PWA support and “Add to Home Screen”
 
@@ -80,6 +83,15 @@ For blocks and interceptions, FST asks whether possession changed and can attrib
 
 You can undo the last event and review a chronological event history for the current point.
 
+### USAU roster import
+
+On **Teams**, use **Import from USAU** and paste an Event Team URL from [play.usaultimate.org](https://play.usaultimate.org), for example:
+
+- `/teams/events/Eventteam/?TeamId=...`
+- `/events/teams/?EventTeamId=...`
+
+Preview the roster, edit jersey numbers if needed (many USAU rows use `#0` when unset), then bulk-add players to a new or existing team.
+
 ---
 
 
@@ -87,16 +99,16 @@ You can undo the last event and review a chronological event history for the cur
 ## Development status
 
 
-| Phase                  | Status         | Summary                                                 |
-| ---------------------- | -------------- | ------------------------------------------------------- |
-| 1 — Core Foundation    | ✅ Done         | Teams, players, games                                   |
-| 2 — Points + Lineups   | ✅ Done         | 7-player lineups, point creation                        |
-| 3 — Stat Entry         | ✅ Done         | Live tracker with turnover logic                        |
-| 4 — Auth & Persistence | ✅ Done         | Supabase auth, RLS, guest mode, claim-on-signup         |
-| 5 — Summaries & +/-    | 🟡 In progress | Scoring works; game stats page and plus/minus not built |
-| 6 — Rosters            | 🟡 Partial     | Manual player entry; CSV import not built               |
-| 7 — Games list         | 🟡 Mostly done | `/games` works; filter/sort not built                   |
-| 8 — Polish & deploy    | ⬜ Not started  | Responsive UI exists; PWA and Vercel deploy pending     |
+| Phase                  | Status         | Summary                                                                 |
+| ---------------------- | -------------- | ----------------------------------------------------------------------- |
+| 1 — Core Foundation    | Done         | Teams, players, games                                                   |
+| 2 — Points + Lineups   | Done         | 7-player lineups, point creation                                        |
+| 3 — Stat Entry         | Done         | Live tracker with turnover logic                                        |
+| 4 — Auth & Persistence | Done         | Supabase auth, RLS, guest mode, claim-on-signup                         |
+| 5 — Summaries & +/-    | Partial     | Game stats page + CSV export done; plus/minus not built                 |
+| 6 — Rosters            | Done         | Manual entry + USAU Event Team import                                   |
+| 7 — Games list         | Mostly done | `/games` list + delete; filter/sort not built                           |
+| 8 — Polish & deploy    | Partial     | Live on Vercel; PWA / Add to Home Screen still pending                  |
 
 
 ---
@@ -109,20 +121,20 @@ You can undo the last event and review a chronological event history for the cur
 
 ### (DONE) PHASE 1 — Core Foundation (Week 1)
 
-🔧 **Setup & Database**
+**Setup & Database**
 
 - Create Next.js project
 - Install Supabase client
 - Configure Supabase environment variables
 - Create tables: teams, players, games
 
-🖥️ **Basic UI**
+**Basic UI**
 
 - Team creation page
 - Add players page (name, jersey #)
 - Game creation page (select light/dark teams)
 
-✔ **Deliverable**
+**Deliverable**
 
 - App runs locally
 - Can add teams/players/games
@@ -131,20 +143,20 @@ You can undo the last event and review a chronological event history for the cur
 
 ### (DONE) PHASE 2 — Points + Lineups (Week 2)
 
-🔧 **Backend**
+**Backend**
 
 - Create points table
 - Create point_lineups table
 - API to create a new point
 
-🖥️ **UI**
+**UI**
 
 - Point start screen
 - Lineup selection UI (pick 7 players per team)
 - Prevent more than 7 from being selected
 - Save lineups to Supabase
 
-✔ **Deliverable**
+**Deliverable**
 
 - Can start a point and assign active players
 
@@ -152,7 +164,7 @@ You can undo the last event and review a chronological event history for the cur
 
 ### (DONE) PHASE 3 — Stat Entry UI (Week 3)
 
-🔧 **Backend**
+**Backend**
 
 - Create events table with comprehensive event tracking
 - Support for multiple event types: `goal`, `assist`, `throwaway`, `drop`, `stall`, `block`, `interception`, `callahan`
@@ -160,7 +172,7 @@ You can undo the last event and review a chronological event history for the cur
 - Team tracking: `team_id` column links events to teams
 - Migration system for schema evolution
 
-🖥️ **UI Features**
+**UI Features**
 
 - **Live Point Tracker**: Real-time stat entry during active points
 - **Player Selection**: Tap player → stat buttons modal
@@ -182,7 +194,7 @@ You can undo the last event and review a chronological event history for the cur
 - **Undo Last Event**: Remove the most recent event
 - **Validation**: Prevents invalid stat combinations (e.g., defense scoring without turnover)
 
-✔ **Deliverable**
+**Deliverable**
 
 - Can fully capture stats during a live point with proper turnover tracking
 - Distinguishes between defensive actions (blocks/interceptions) and turnover outcomes
@@ -192,7 +204,7 @@ You can undo the last event and review a chronological event history for the cur
 
 ### (DONE) PHASE 4 — User Authentication & Data Persistence (Week 4)
 
-🔧 **Backend**
+**Backend**
 
 - Set up Supabase Authentication
 - Add `user_id` columns to teams, players, and games tables
@@ -200,7 +212,7 @@ You can undo the last event and review a chronological event history for the cur
 - Create migration for user_id columns
 - Support guest mode (`user_id = NULL`)
 
-🖥️ **UI**
+**UI**
 
 - Sign up page (email/password)
 - Sign in page
@@ -208,7 +220,7 @@ You can undo the last event and review a chronological event history for the cur
 - User session management
 - "Claim existing data" flow for guest → authenticated transition (on sign up)
 
-✔ **Deliverable**
+**Deliverable**
 
 - Users can create accounts
 - Data is associated with user accounts
@@ -219,89 +231,89 @@ You can undo the last event and review a chronological event history for the cur
 
 ### (PARTIAL) PHASE 5 — Score, Summaries & Plus/Minus (Week 5)
 
-🔧 **Backend computation**
+**Backend computation**
 
-- ✅ Point completion updates `points.scoring_team_id` and game score
-- ✅ Live per-player stat badges during active points
-- ⬜ Compute points played (count lineups)
-- ⬜ Compute plus/minus
-- ⬜ Compute stat totals per game (aggregated across all points)
+- [x] Point completion updates `points.scoring_team_id` and game score
+- [x] Live per-player stat badges during active points
+- [x] Compute points played (count lineups)
+- [x] Compute stat totals per game (aggregated across all points)
+- [ ] Compute plus/minus
 
-🖥️ **UI**
+**UI**
 
-- ✅ Team score display during games
-- ⬜ Game stats page
-- ⬜ Player stat summaries (full game)
-- ⬜ CSV export
+- [x] Team score display during games
+- [x] Game stats page (`/games/[id]/stats`)
+- [x] Player and team stat summaries (full game)
+- [x] CSV export of game stats
 
-✔ **Deliverable**
+**Deliverable**
 
-- All core Frisbee stats computed correctly *(in progress)*
+- Core Frisbee stats computed and exportable *(plus/minus still pending)*
 
 
 
-### (PARTIAL) PHASE 6 — Importing & Rosters (Week 6)
+### (DONE) PHASE 6 — Importing & Rosters (Week 6)
 
-🔧 **Backend**
+**Backend**
 
-- ⬜ CSV import for players
-- ✅ Manual add player
-- ⬜ Optional: USAU roster scraper
+- [x] Manual add player
+- [x] USAU Event Team roster fetch + parse (`POST /api/usau/roster`)
+- Supports both `TeamId` and `EventTeamId` Event Team URLs
 
-🖥️ **UI**
+**UI**
 
-- ⬜ Upload CSV modal
-- ⬜ Validate player fields
-- ⬜ Select team for imported players
-- ✅ Manual roster management on `/teams`
+- [x] Manual roster management on `/teams`
+- [x] Import from USAU modal (preview, edit jersey #s, select players)
+- [x] Create new team or import into an existing team
 
-✔ **Deliverable**
+**Deliverable**
 
-- Fast roster setup without manual typing *(partial — manual entry only)*
+- Fast roster setup from USAU Event Team pages without manual typing
 
 
 
 ### (MOSTLY DONE) PHASE 7 — Games List & Navigation (Week 7)
 
-🔧 **Backend**
+**Backend**
 
 - No database changes needed
 - Query all games from existing games table (filtered by `user_id` if authenticated)
 
-🖥️ **UI**
+**UI**
 
-- ✅ Create `/games` page listing all games
-- ✅ Show game name, date, teams, scores, status
-- ✅ Link to individual game pages
-- ✅ Add "View All Games" to homepage navigation
-- ⬜ Filter/sort games (by date, status, etc.)
+- [x] Create `/games` page listing all games
+- [x] Show game name, date, teams, scores, status
+- [x] Link to individual game pages
+- [x] Add "View All Games" to homepage navigation
+- [x] Delete games from the games list
+- [ ] Filter/sort games (by date, status, etc.)
 
-✔ **Deliverable**
+**Deliverable**
 
 - Users can view and return to past games
 - Easy navigation between games
 
 
 
-### PHASE 8 — Polish + Deployment (Week 8)
+### (PARTIAL) PHASE 8 — Polish + Deployment (Week 8)
 
-📱 **Mobile Improvements**
+**Mobile Improvements**
 
-- ✅ Responsive layout for phones/iPads (partial)
-- ✅ Large tap targets (partial)
-- ⬜ Offline caching of previous game
+- [x] Responsive layout for phones/iPads (partial)
+- [x] Large tap targets (partial)
+- [ ] Offline caching of previous game
 
-🚀 **Deployment**
+**Deployment**
 
-- ⬜ Add PWA support
-- ⬜ "Add to Home Screen" functionality
-- ⬜ Deploy to Vercel
-- ⬜ Create production Supabase project
+- [x] Deploy to Vercel
+- [x] Production Supabase project in use
+- [ ] Add PWA support
+- [ ] "Add to Home Screen" functionality
 
-✔ **Deliverable**
+**Deliverable**
 
-- Stable MVP
-- Mobile installable app
+- Stable MVP on Vercel
+- Mobile installable app *(PWA still pending)*
 
 
 
@@ -311,13 +323,13 @@ You can undo the last event and review a chronological event history for the cur
 - Per-game jersey colors and pulling team selection
 - Configurable points to win with game-over and universe-point UI
 - Reload previous point lineup
-- Delete games from the games list
+- USAU Event Team roster import (TeamId + EventTeamId URLs)
 
 
 
 ### TESTING TASKS (Throughout)
 
-📱 **Mobile debugging**
+**Mobile debugging**
 
 - Test on iPhone using the production Vercel URL or local network IP during development
 - Test on iPad
